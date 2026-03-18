@@ -83,6 +83,7 @@ class AppViewModel : ViewModel() {
         initialValue = emptyList()
         )
 
+    // Getting total stand count.
     val totalStands: StateFlow<Int> = filteredStands
         .map { it.size }
         .stateIn(
@@ -91,6 +92,7 @@ class AppViewModel : ViewModel() {
             initialValue = 0
         )
 
+    // Getting total sits for all stands
     val totalSits: StateFlow<Int> = filteredStands.map { list ->
         list.sumOf { it.sitCount } }
         .stateIn(
@@ -99,6 +101,7 @@ class AppViewModel : ViewModel() {
             initialValue = 0
         )
 
+    // Average sits for all stands
     val averageSits: StateFlow<Int> = filteredStands.map { list ->
         list.map { it.sitCount }.average().toInt() }
         .stateIn(
@@ -163,6 +166,7 @@ class AppViewModel : ViewModel() {
         _stands.value = _stands.value.filter { it != stand }
     }
 
+    // Used to chack if stand is taken
     fun isStandTaken(name: String): Boolean{
         return filteredStands.value.any { it.name.equals(name, ignoreCase = false) }
     }
@@ -182,6 +186,8 @@ class AppViewModel : ViewModel() {
         }
     }
 
+    // Add a sit to stand manually
+    // !! Need to Add date input for stand data collection to calculate stand health.
     fun addSit(standToUpdate: Stand){
         _stands.value = _stands.value.map { stand ->
             if (stand.name == standToUpdate.name) {

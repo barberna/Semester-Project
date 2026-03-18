@@ -69,16 +69,17 @@ import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.ktx.model.cameraPosition
 
-// API KEY: AIzaSyAXGHKmx9S8ieVw3r93ZcsaNT1T384J1h8
 @Composable
 fun AddStandScreen(
     viewModel: AppViewModel,
     onAddStand: () -> Unit
 ) {
 
+    // Getting Current Context from Android to use for location permission
     val context = LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
+    // Create a Default camera/location in case of no location permission
     val defaultLocation = LatLng(42.9634, -85.6681)
     val cameraPositionState = rememberCameraPositionState {
         position = CameraPosition.fromLatLngZoom(defaultLocation, 10f)
@@ -98,7 +99,6 @@ fun AddStandScreen(
         MapProperties(
             mapStyleOptions = MapStyleOptions.loadRawResourceStyle(context, com.example.finalproject.R.raw.map_style),
             isMyLocationEnabled = true
-
         )
     }
 

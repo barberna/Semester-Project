@@ -101,16 +101,12 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
 
     var selectedStand by remember { mutableStateOf<Stand?>(null) }
 
+    val defaultLocation = LatLng(42.9634, -85.6681)
     val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(LatLng(42.9634, -85.6681), 10f)
+        position = CameraPosition.fromLatLngZoom(defaultLocation, 5f)
     }
 
     var hasInitialSnapPerformed by remember { mutableStateOf(false) }
-
-    val markerStates = remember(stands) { stands.map { stand ->
-        stand.name to stand.cord
-        }
-    }
 
     LaunchedEffect(stands) {
         val firstStand = stands.firstOrNull()
@@ -168,6 +164,7 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
                             )
                         }
                     }
+                    // Clicking on a Pin open shis Surface and when clicked off disappears
                     if (selectedStand == null) {
                         Surface(
                             modifier = Modifier
@@ -197,7 +194,7 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
                     }
                 }
             }
-
+            // If Selected Stands get details from stand and Call StandDetailCard() and add animation
             AnimatedVisibility(
                 visible =  selectedStand != null,
                 enter = slideInVertically { it } + fadeIn(),
