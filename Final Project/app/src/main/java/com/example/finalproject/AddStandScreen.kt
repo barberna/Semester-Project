@@ -95,6 +95,8 @@ fun AddStandScreen(
         }
     }
 
+    // Add map Style from JSON data and add it to a val as well as isMylocationEnabled
+    // https://mapstyle.withgoogle.com/
     val mapProperties = remember {
         MapProperties(
             mapStyleOptions = MapStyleOptions.loadRawResourceStyle(context, com.example.finalproject.R.raw.map_style),

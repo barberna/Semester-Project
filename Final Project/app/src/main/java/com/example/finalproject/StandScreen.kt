@@ -110,6 +110,7 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
 
     LaunchedEffect(stands) {
         val firstStand = stands.firstOrNull()
+
         if (firstStand != null && !hasInitialSnapPerformed) {
             cameraPositionState.position = CameraPosition.fromLatLngZoom(firstStand.cord, 10f)
             hasInitialSnapPerformed = true
