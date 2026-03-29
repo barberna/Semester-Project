@@ -1,16 +1,15 @@
 package com.example.finalproject
 
-import android.annotation.SuppressLint
-import android.graphics.drawable.Icon
-import android.location.Location
-import android.util.Log
+import android.Manifest
+
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Animation
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,42 +20,20 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.ExitToApp
-import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.TouchApp
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.Divider
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -66,23 +43,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-import com.example.finalproject.ui.theme.FinalProjectTheme
+import androidx.core.content.ContextCompat
+import com.example.finalproject.data.Stand
 import com.example.finalproject.ui.theme.HunterOrange
 import com.example.finalproject.ui.theme.LightestGray
-import com.example.finalproject.ui.theme.grayGreen
-import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
@@ -90,7 +61,6 @@ import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
-import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberMarkerState
 
@@ -101,29 +71,73 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
 
     var selectedStand by remember { mutableStateOf<Stand?>(null) }
 
-    val defaultLocation = LatLng(42.9634, -85.6681)
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(defaultLocation, 5f)
+
+
+    val context = LocalContext.current
+    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+
+    // Track permission state to safely enable My Location layer
+    var locationPermissionGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        )
     }
 
-    var hasInitialSnapPerformed by remember { mutableStateOf(false) }
+    // Create a Default camera/location in case of no location permission
+    val defaultLocation = LatLng(42.9634, -85.6681)
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(defaultLocation, 10f)
+    }
 
-    LaunchedEffect(stands) {
-        val firstStand = stands.firstOrNull()
+    // Location Permission Requester
+    val locationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+            permissions ->
+        locationPermissionGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+    }
 
-        if (firstStand != null && !hasInitialSnapPerformed) {
-            cameraPositionState.position = CameraPosition.fromLatLngZoom(firstStand.cord, 10f)
-            hasInitialSnapPerformed = true
+    // Add map Style from JSON data and add it to a val as well as isMylocationEnabled
+    // https://mapstyle.withgoogle.com/
+    val mapProperties = remember(locationPermissionGranted) {
+        MapProperties(
+            mapStyleOptions = MapStyleOptions.loadRawResourceStyle(context, com.example.finalproject.R.raw.map_style),
+            isMyLocationEnabled = locationPermissionGranted
+        )
+    }
+
+    // Track if we have performed initial camera positioning
+    var initialPositionSet by remember { mutableStateOf(false) }
+
+    // Camera Positioning Logic: First Stand > Current Location > Default (initial value)
+    LaunchedEffect(stands, locationPermissionGranted) {
+        if (!initialPositionSet) {
+            if (stands.isNotEmpty()) {
+                // Priority 1: Focus on the first stand
+                cameraPositionState.position = CameraPosition.fromLatLngZoom(stands[0].cord, 13f)
+                initialPositionSet = true
+            } else if (locationPermissionGranted) {
+                // Priority 2: Focus on current location (if no stands yet)
+                getCurrentLocation(fusedLocationClient) { location ->
+                    if (!initialPositionSet) { // Double check in case stands loaded during async call
+                        cameraPositionState.position = CameraPosition.fromLatLngZoom(location, 13f)
+                        initialPositionSet = true
+                    }
+                }
+            }
         }
     }
 
-    // Allows for Custom Map Theme
-    val context = LocalContext.current
-    val mapProperties = remember {
-        MapProperties(
-            mapStyleOptions = MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style)
-
-        )
+    // Launch permission request on start if not already granted
+    LaunchedEffect(Unit) {
+        if (!locationPermissionGranted) {
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                )
+            )
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {

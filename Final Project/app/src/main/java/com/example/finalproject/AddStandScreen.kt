@@ -40,6 +40,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,6 +80,18 @@ fun AddStandScreen(
     val context = LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
+    // Collect error from viewModel
+    val addStandError by viewModel.addStandErrorMessage.collectAsState()
+
+
+    // Track permission state to safely enable My Location layer
+    var locationPermissionGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
     // Create a Default camera/location in case of no location permission
     val defaultLocation = LatLng(42.9634, -85.6681)
     val cameraPositionState = rememberCameraPositionState {
@@ -88,31 +101,28 @@ fun AddStandScreen(
     // Location Permission Requester
     val locationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         permissions ->
-        if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true) {
+        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        locationPermissionGranted = granted
+        if (granted) {
             getCurrentLocation(fusedLocationClient) { location ->
-                cameraPositionState.position = CameraPosition.fromLatLngZoom(location, 5f)
+                cameraPositionState.position = CameraPosition.fromLatLngZoom(location, 13f)
             }
         }
     }
 
     // Add map Style from JSON data and add it to a val as well as isMylocationEnabled
     // https://mapstyle.withgoogle.com/
-    val mapProperties = remember {
+    val mapProperties = remember(locationPermissionGranted) {
         MapProperties(
             mapStyleOptions = MapStyleOptions.loadRawResourceStyle(context, com.example.finalproject.R.raw.map_style),
-            isMyLocationEnabled = true
+            isMyLocationEnabled = locationPermissionGranted
         )
     }
 
     // Launch permission request on start
     LaunchedEffect(Unit) {
-        // Check if we ALREADY have permission
-        val hasPermission = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (hasPermission) {
+        if (locationPermissionGranted) {
             // We already have it! Just get the location.
             getCurrentLocation(fusedLocationClient) { location ->
                 cameraPositionState.position = CameraPosition.fromLatLngZoom(location, 13f)
@@ -128,6 +138,21 @@ fun AddStandScreen(
         }
     }
 
+    val addStandSuccess by viewModel.addStandSuccess.collectAsState()
+
+
+    LaunchedEffect(addStandError, addStandSuccess) {
+        if (addStandError != null) {
+            Toast.makeText(context, addStandError, Toast.LENGTH_SHORT).show()
+            viewModel.clearAddStandError()
+        }
+
+        if (addStandSuccess) {
+            onAddStand()
+            viewModel.clearAddStandSuccess()
+        }
+    }
+
         Box(modifier = Modifier.fillMaxSize()) {
             Column(
                 modifier = Modifier
@@ -136,6 +161,7 @@ fun AddStandScreen(
                 horizontalAlignment = Alignment.CenterHorizontally
 
             ) {
+                // Google Map Card
                 Card(
                     modifier = Modifier
                         .height(450.dp)
@@ -152,7 +178,7 @@ fun AddStandScreen(
                             modifier = Modifier.fillMaxSize(),
                             cameraPositionState = cameraPositionState,
                             properties = mapProperties,
-                            uiSettings = MapUiSettings(myLocationButtonEnabled = true),
+                            uiSettings = MapUiSettings(myLocationButtonEnabled = locationPermissionGranted),
                         )
 
                         {
@@ -162,7 +188,7 @@ fun AddStandScreen(
                                 draggable = true,
                             )
                         }
-                        // Attention to move marker
+                        // Attention to move marker, Sits on top of Map
                         Surface(
                             modifier = Modifier
                                 .align(Alignment.TopCenter)
@@ -191,6 +217,7 @@ fun AddStandScreen(
                     }
                 }
 
+                // Shows Flow of marker current location
                 Text(
                     text = "Pin Coordinates: ${"%.5f".format(cameraPositionState.position.target.latitude)} ${
                         "%.5f".format(
@@ -203,6 +230,7 @@ fun AddStandScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
+                // Stand Name Input
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -225,10 +253,14 @@ fun AddStandScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
+                // Add Stand Button
                 Row(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                     Button(
                         onClick = {
-                            if (viewModel.isStandTaken(viewModel.usernameInput)) {
+                            if (viewModel.usernameInput.isBlank()) {
+                                Toast.makeText(context, "Stand Name Required!", Toast.LENGTH_SHORT)
+                                    .show()
+                            } else if (viewModel.isStandTaken(viewModel.usernameInput, -1)) {
                                 Toast.makeText(context, "Stand Name Taken!", Toast.LENGTH_SHORT)
                                     .show()
                             } else {
@@ -236,11 +268,10 @@ fun AddStandScreen(
                                     cameraPositionState.position.target,
                                     viewModel.usernameInput
                                 )
-                                onAddStand()
                             }
                         },
                         colors = ButtonDefaults.buttonColors(
-                            HunterOrange,
+                            containerColor = HunterOrange,
                             contentColor = Color.White
                         ),
                         modifier = Modifier.weight(0.75f)
@@ -251,7 +282,7 @@ fun AddStandScreen(
 }
 
 @SuppressLint("MissingPermission") // We handle this in the UI with the Launcher
-private fun getCurrentLocation(
+fun getCurrentLocation(
     fusedLocationClient: FusedLocationProviderClient,
     onLocationRetrieved: (LatLng) -> Unit
 ) {

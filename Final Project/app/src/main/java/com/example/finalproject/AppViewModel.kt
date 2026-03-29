@@ -1,14 +1,16 @@
 package com.example.finalproject
 
-import androidx.compose.animation.SharedTransitionScope
+import android.app.Application
+
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.android.gms.maps.model.CameraPosition
+import com.example.finalproject.data.HuntHealthDAO
+import com.example.finalproject.data.Stand
 import com.google.android.gms.maps.model.LatLng
-import com.google.maps.android.compose.rememberCameraPositionState
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,33 +21,32 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 enum class HealthStatus {GOOD, OKAY, BAD}
-
-data class Stand(
-    val name: String,
-    val cord: LatLng,
-    val sitCount: Int,
-    val healthStatus: HealthStatus,
-    val userName: String
-    )
 
 data class User(
         val userName: String,
         val password: String
         )
 
-class AppViewModel : ViewModel() {
+// To Implement
+    // Add DB Insert Call plus error handling
+
+class AppViewModel(application: Application) : AndroidViewModel(application) {
+
+    // Get the database instance from your Application class
+    // Access the DAO specifically (assuming you named the function 'huntHealthDao()')
+    private val appDAO: HuntHealthDAO = (application as HuntHealth).appDB.getInstance()
+
+    init {
+      viewModelScope.launch(Dispatchers.IO) {
+          appDAO.getStands().collect { _stands.value = it }
+      }
+    }
 
     // Each stand is a list, so this is a list of lists
-    private val _stands = MutableStateFlow(listOf(
-        Stand("Apple Tree", LatLng(43.26755, -86.10963), 5, HealthStatus.OKAY, "nathan"),
-        Stand("Swamp", LatLng(43.25169, -86.19497), 3, HealthStatus.GOOD, "nathan"),
-        Stand("Hemlock", LatLng(43.25040, -86.00015), 10, HealthStatus.BAD, "nathan"),
-        Stand("Pines", LatLng(43.22354, -85.92077), 4, HealthStatus.GOOD, "nathan"),
-        Stand("Pines1", LatLng(44.81569, -85.21633), 4, HealthStatus.GOOD, "barber"),
-        Stand("Pines2", LatLng(44.80997, -85.20686), 4, HealthStatus.GOOD, "barber")
-    ))
+    private val _stands = MutableStateFlow<List<Stand>>(emptyList())
     val stands = _stands.asStateFlow()
 
     // Store List all of all users
@@ -62,6 +63,39 @@ class AppViewModel : ViewModel() {
     var isLoading by mutableStateOf(false)
     var loginError by mutableStateOf(false)
     var isLoginSuccessful by mutableStateOf(false)
+
+    // DB Error handling
+    private val _addStandErrorMessage = MutableStateFlow<String?>(null)
+    private val _deleteStandErrorMessage = MutableStateFlow<String?>(null)
+    private val _updateNameErrorMessage = MutableStateFlow<String?>(null)
+
+    val addStandErrorMessage: StateFlow<String?> = _addStandErrorMessage
+    val deleteStandErrorMessage: StateFlow<String?> = _deleteStandErrorMessage
+    val updateNameErrorMessage: StateFlow<String?> = _updateNameErrorMessage
+
+    fun clearAddStandError() {
+        _addStandErrorMessage.value = null
+    }
+    fun clearDeleteStandError() {
+        _deleteStandErrorMessage.value = null
+    }
+    fun clearUpdateNameError() {
+        _updateNameErrorMessage.value = null
+    }
+
+    // Handles DB Insert Success before navigation back to stand screen
+    private val _addStandSuccess = MutableStateFlow(false)
+    val addStandSuccess = _addStandSuccess.asStateFlow()
+    fun clearAddStandSuccess() {
+        _addStandSuccess.value = false
+    }
+
+    // Error Handling ViewModel
+    private val _updateStandNameTakenErrorMessage = MutableStateFlow<String?>(null)
+    val updateStandNameTakenErrorMessage: StateFlow<String?> = _updateStandNameTakenErrorMessage
+    fun clearUpdateStandNameTakenError() {
+        _updateStandNameTakenErrorMessage.value = null
+    }
 
     var statusMessage by mutableStateOf("")
 
@@ -163,26 +197,58 @@ class AppViewModel : ViewModel() {
     }
 
     fun deleteStand(stand: Stand){
-        _stands.value = _stands.value.filter { it != stand }
+        // store original list in case of error
+        val originalList = _stands.value
+
+        _stands.value = _stands.value.filter { it.id != stand.id }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                appDAO.removeStand(stand)
+            } catch (e: Exception) {
+                _stands.value = originalList
+                _deleteStandErrorMessage.value = "DB error, Could not delete stand. Try again Later."
+            }
+        }
     }
 
     // Used to chack if stand is taken
-    fun isStandTaken(name: String): Boolean{
-        return filteredStands.value.any { it.name.equals(name, ignoreCase = false) }
+    fun isStandTaken(name: String, currentStandId: Int): Boolean{
+        return filteredStands.value.any { it.name.equals(name, ignoreCase = false) && it.id  != currentStandId}
     }
 
     // Create Function that checks if name is taken by another stand, if not then create a map
     // of all stands then, if stand.name is the same as the stand to update then create a copy,
     // and change the name
     fun updateStandName(standToUpdate: Stand, newName: String) {
-        if (!isStandTaken(newName)) {
+        if (standToUpdate.name == newName) return
+
+        val originalList = _stands.value
+
+        if (!isStandTaken(newName, standToUpdate.id)) {
             _stands.value = _stands.value.map { stand ->
-                if (stand.name == standToUpdate.name) {
+                if (stand.id == standToUpdate.id) {
                     stand.copy(name = newName)
                 } else {
                     stand
                 }
             }
+
+
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    val updatedStand = standToUpdate.copy(name = newName)
+                    appDAO.changeStandName(updatedStand)
+                } catch (e: Exception) {
+                    // 3. Roll back on the Main Thread if DB fails
+                    withContext(Dispatchers.Main) {
+                        _stands.value = originalList
+                        _updateNameErrorMessage.value = "DB Error, Could not change name, try again later."
+                    }
+                }
+            }
+        } else {
+            _updateNameErrorMessage.value = "The name $newName is already taken."
         }
     }
 
@@ -198,8 +264,26 @@ class AppViewModel : ViewModel() {
         }
     }
     fun addStand(cord: LatLng, name: String){
-        val newStand = Stand(name, cord, 0, HealthStatus.GOOD, _currentUser.value)
+        val originalStands = _stands.value
+
+        val newStand = Stand(name = name, cord = cord, sitCount =  0, healthStatus = HealthStatus.GOOD, userName = _currentUser.value)
         _stands.update { it + newStand }
         usernameInput = ""
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                appDAO.addStand(newStand)
+
+                withContext(Dispatchers.Main) {
+                    _addStandSuccess.value = true
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    _stands.value = originalStands
+                    _addStandErrorMessage.value = "DB Error, Could not add stand, try again later."
+                    _addStandSuccess.value = false
+                }
+            }
+        }
     }
 }

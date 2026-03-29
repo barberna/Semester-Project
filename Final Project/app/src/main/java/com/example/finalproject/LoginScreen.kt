@@ -133,5 +133,5 @@ fun LoginScreen(viewModel: AppViewModel, onSignUp: () -> Unit){
 @Preview(showBackground = true)
 @Composable
 fun LoginScreenPreview(){
-    LoginScreen(viewModel = AppViewModel(), onSignUp = {})
+
 }

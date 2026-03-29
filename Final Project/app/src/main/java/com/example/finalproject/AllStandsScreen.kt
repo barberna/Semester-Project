@@ -1,5 +1,6 @@
 package com.example.finalproject
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +33,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,10 +45,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.finalproject.data.Stand
 import com.example.finalproject.ui.theme.HunterOrange
 import kotlinx.coroutines.flow.StateFlow
 
@@ -56,7 +60,27 @@ fun AllStandsScreen(viewModel: AppViewModel) {
 
     val totalSits by viewModel.totalSits.collectAsState()
     val totalStands by viewModel.totalStands.collectAsState()
-    val avgSits by viewModel.totalStands.collectAsState()
+    val avgSits by viewModel.averageSits.collectAsState()
+
+    val updateStandNameError by viewModel.updateNameErrorMessage.collectAsState()
+    val deleteStandError by viewModel.deleteStandErrorMessage.collectAsState()
+
+    val context = LocalContext.current
+
+
+    // Error Handling (Toast + Clear)
+    LaunchedEffect(updateStandNameError, deleteStandError) {
+        // Handle DB Delete Error (Toast + Clear)
+        if (deleteStandError != null) {
+            Toast.makeText(context, deleteStandError, Toast.LENGTH_SHORT).show()
+            viewModel.clearDeleteStandError()
+        }
+        // Handle DB/System Failure for Name Update(Toast + Clear)
+        if (updateStandNameError != null) {
+            Toast.makeText(context, updateStandNameError, Toast.LENGTH_SHORT).show()
+            viewModel.clearUpdateNameError()
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
 
@@ -103,6 +127,8 @@ fun StandsContentCard(
 
     var changeStandInput by remember { mutableStateOf(stand.name) }
 
+    val updateStandNameTakenError by viewModel.updateStandNameTakenErrorMessage.collectAsState()
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -146,7 +172,7 @@ fun StandsContentCard(
                     HealthBar(stand.healthStatus)
                 }
 
-
+                // Allows for dropdown menu to expand
                 IconButton(onClick = { isExpanded = !isExpanded }) {
                     Icon(
                         imageVector = Icons.Default.ArrowDropDown,
@@ -172,9 +198,16 @@ fun StandsContentCard(
                         ,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // Enter New Name
                         OutlinedTextField(
                             value = changeStandInput,
-                            onValueChange = { changeStandInput = it },
+                            // Handle Name TakenError Here Also
+                            onValueChange = { changeStandInput = it
+                                if (updateStandNameTakenError != null) viewModel.clearUpdateStandNameTakenError() },
+                            isError = updateStandNameTakenError != null,
+                            // Error Message for Name Taken
+                            supportingText = {
+                                updateStandNameTakenError?.let { Text(text = it, color = Color.Red) } },
                             singleLine = true,
                             label = { Text("Enter New Stand Name") },
                             modifier = Modifier
@@ -187,8 +220,10 @@ fun StandsContentCard(
                             )
                         )
                         Spacer(modifier = Modifier.width(8.dp))
+                        // Button to update name
                         Button(
                             onClick = { onChangeName(stand, changeStandInput) },
+                            enabled = changeStandInput.isNotBlank() && changeStandInput != stand.name,
                             modifier = Modifier.weight(0.75f).padding(top = 8.dp),
                             colors = ButtonDefaults.buttonColors(Color.Black, Color.White)
                         ) {
@@ -196,6 +231,7 @@ fun StandsContentCard(
                         }
                     }
 
+                    // Button to delete stand
                     Button(
                         onClick = { onDelete(stand) },
                         modifier = Modifier.fillMaxWidth(0.4f).padding(top = 10.dp),
@@ -203,11 +239,11 @@ fun StandsContentCard(
                     ) {
                         Text("Delete", style = MaterialTheme.typography.labelLarge)
                     }
+                    }
                 }
             }
         }
     }
-}
 
 @Composable
 fun standOverviewCard(text: String, icon: ImageVector, data: Int, modifier: Modifier = Modifier){

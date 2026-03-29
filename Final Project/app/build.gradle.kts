@@ -1,9 +1,18 @@
+room {
+    schemaDirectory("$projectDir/schemas")
+}
+
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     // 1. ADD THE SECRETS PLUGIN HERE
     alias(libs.plugins.google.maps.secrets)
     kotlin("plugin.serialization") version "2.0.0"
+
+    // DB Plugins
+    id("com.google.devtools.ksp")
+    id("androidx.room")
 }
 
 android {
@@ -43,8 +52,16 @@ android {
 }
 
 dependencies {
+    // DB Dep
+    val room_version = "2.8.1"
+    implementation("androidx.room:room-runtime:$room_version")
+    ksp("androidx.room:room-compiler:$room_version")
+    implementation("androidx.room:room-ktx:$room_version")
+
+    // Location Dep
     implementation(libs.play.services.location)
 
+    // Maps Dep
     implementation(libs.maps.compose)
     implementation(libs.play.services.maps)
 
@@ -65,6 +82,8 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+
+    // Navigation Dep
     implementation("androidx.navigation:navigation-compose:2.8.0")
     implementation("androidx.navigation:navigation-runtime-ktx:2.9.7")
 }
