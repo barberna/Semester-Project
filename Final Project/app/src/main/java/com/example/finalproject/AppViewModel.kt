@@ -5,6 +5,7 @@ import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.finalproject.data.HuntHealthDAO
@@ -255,8 +256,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     // Add a sit to stand manually
     // !! Need to Add date input for stand data collection to calculate stand health.
     fun addSit(standToUpdate: Stand){
+        val originalStands = _stands.value
+
+
         _stands.value = _stands.value.map { stand ->
-            if (stand.name == standToUpdate.name) {
+            if (stand.id == standToUpdate.id) {
                 stand.copy(sitCount = stand.sitCount + 1)
             } else {
                 stand
@@ -287,3 +291,4 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 }
+

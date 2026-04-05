@@ -146,7 +146,7 @@ fun AddStandScreen(
             Toast.makeText(context, addStandError, Toast.LENGTH_SHORT).show()
             viewModel.clearAddStandError()
         }
-
+        // If stand add success call navigation call onAddStand() and clear the error using helper function
         if (addStandSuccess) {
             onAddStand()
             viewModel.clearAddStandSuccess()

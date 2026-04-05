@@ -109,6 +109,18 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
     // Track if we have performed initial camera positioning
     var initialPositionSet by remember { mutableStateOf(false) }
 
+    // Launch permission request on start if not already granted
+    LaunchedEffect(Unit) {
+        if (!locationPermissionGranted) {
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                )
+            )
+        }
+    }
+
     // Camera Positioning Logic: First Stand > Current Location > Default (initial value)
     LaunchedEffect(stands, locationPermissionGranted) {
         if (!initialPositionSet) {
@@ -125,18 +137,6 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
                     }
                 }
             }
-        }
-    }
-
-    // Launch permission request on start if not already granted
-    LaunchedEffect(Unit) {
-        if (!locationPermissionGranted) {
-            locationPermissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION,
-                )
-            )
         }
     }
 
@@ -227,7 +227,7 @@ fun StandDetailCard(stand: Stand) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 10.dp),
+            .padding(bottom = 10.dp, start = 10.dp, end = 10.dp),
         shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White.copy(0.8f)),
         elevation = CardDefaults.cardElevation(12.dp)

@@ -20,16 +20,26 @@ import kotlinx.coroutines.flow.Flow
     tableName = "Stands",
     indices = [Index(value = ["name"], unique = true)]
 )
+
 data class Stand(@PrimaryKey(autoGenerate = true) val id: Int = 0,
-    val name: String,
-    val cord: LatLng,
-    val sitCount: Int,
-    val healthStatus: HealthStatus,
-    val userName: String
+                 val name: String,
+                 val cord: LatLng,
+                 val sitCount: Int,
+                 val healthStatus: HealthStatus,
+                 val userName: String
+)
+
+@Entity(tableName = "Sits")
+data class Sit(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val standId: Int,
+    val standName: String,
+    val date: String
 )
 
 @Dao
 interface HuntHealthDAO {
+    // Stands Table Calls
     @Insert
     suspend fun addStand(stand: Stand)
 
@@ -39,8 +49,24 @@ interface HuntHealthDAO {
     @Update
     suspend fun changeStandName(stand: Stand)
 
+    @Update
+    suspend fun addSit(stand: Stand)
+
     @Query("SELECT * FROM Stands")
     fun getStands(): Flow<List<Stand>>
+
+    // Sits Table Calls
+    @Insert
+    suspend fun addSitRecord(sit: Sit)
+
+    @Delete
+    suspend fun removeSitRecord(sit: Sit)
+
+    @Query("SELECT * FROM Sits WHERE standId = :standId")
+    fun getStandSits(standId: Int): Flow<List<Sit>>
+
+    @Query("SELECT * FROM Sits")
+    fun getAllSits(): Flow<List<Sit>>
 }
 
 class Converters {
@@ -66,7 +92,7 @@ class Converters {
     }
 }
 
-@Database(entities = [Stand::class],
+@Database(entities = [Stand::class, Sit::class],
     version = 1, exportSchema = true)
 @TypeConverters(Converters::class)
 abstract class HuntHealthDB: RoomDatabase() {
