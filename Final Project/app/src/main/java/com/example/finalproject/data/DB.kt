@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Delete
 import androidx.room.Entity
+import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.Insert
 import androidx.room.PrimaryKey
@@ -15,26 +16,38 @@ import androidx.room.Update
 import com.example.finalproject.HealthStatus
 import com.google.android.gms.maps.model.LatLng
 import kotlinx.coroutines.flow.Flow
+import java.time.LocalDate
 
 @Entity (
     tableName = "Stands",
     indices = [Index(value = ["name"], unique = true)]
 )
 
-data class Stand(@PrimaryKey(autoGenerate = true) val id: Int = 0,
-                 val name: String,
-                 val cord: LatLng,
-                 val sitCount: Int,
-                 val healthStatus: HealthStatus,
-                 val userName: String
+data class Stand(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+     val name: String,
+     val cord: LatLng,
+     val sitCount: Int,
+     val healthStatus: HealthStatus,
+     val userName: String
 )
 
-@Entity(tableName = "Sits")
+@Entity(
+    tableName = "Sits",
+    foreignKeys = [
+        ForeignKey(
+            entity = Stand::class,
+            parentColumns = ["id"],
+            childColumns = ["standId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ]
+)
 data class Sit(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val standId: Int,
     val standName: String,
-    val date: String
+    val date: LocalDate
 )
 
 @Dao
@@ -59,8 +72,8 @@ interface HuntHealthDAO {
     @Insert
     suspend fun addSitRecord(sit: Sit)
 
-    @Delete
-    suspend fun removeSitRecord(sit: Sit)
+    @Query("UPDATE Sits SET standName = :newName WHERE standId = :id")
+    suspend fun updateSitRecordName(id: Int, newName: String)
 
     @Query("SELECT * FROM Sits WHERE standId = :standId")
     fun getStandSits(standId: Int): Flow<List<Sit>>
@@ -69,7 +82,7 @@ interface HuntHealthDAO {
     fun getAllSits(): Flow<List<Sit>>
 }
 
-class Converters {
+class CordConverters {
     @TypeConverter
     fun fromLatLng(latLng: LatLng): String {
         return "${latLng.latitude},${latLng.longitude}"
@@ -92,9 +105,21 @@ class Converters {
     }
 }
 
+class DateConverters {
+    @TypeConverter
+    fun fromString(value: String?): LocalDate? {
+        return value?.let { LocalDate.parse(it) }
+    }
+
+    @TypeConverter
+    fun dateToString(date: LocalDate?): String? {
+        return date?.toString()
+    }
+}
+
 @Database(entities = [Stand::class, Sit::class],
     version = 1, exportSchema = true)
-@TypeConverters(Converters::class)
+@TypeConverters(CordConverters::class, DateConverters::class)
 abstract class HuntHealthDB: RoomDatabase() {
     abstract fun getInstance(): HuntHealthDAO
 }

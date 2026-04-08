@@ -126,7 +126,7 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
         if (!initialPositionSet) {
             if (stands.isNotEmpty()) {
                 // Priority 1: Focus on the first stand
-                cameraPositionState.position = CameraPosition.fromLatLngZoom(stands[0].cord, 13f)
+                cameraPositionState.position = CameraPosition.fromLatLngZoom(stands[0].cord, 11f)
                 initialPositionSet = true
             } else if (locationPermissionGranted) {
                 // Priority 2: Focus on current location (if no stands yet)

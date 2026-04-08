@@ -1,5 +1,6 @@
 package com.example.finalproject
 
+import android.R
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -32,6 +33,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -52,7 +54,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.finalproject.data.Stand
 import com.example.finalproject.ui.theme.HunterOrange
-import kotlinx.coroutines.flow.StateFlow
+
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.TextButton
+import java.time.Instant
+import java.time.LocalDate
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material3.contentColorFor
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 @Composable
 fun AllStandsScreen(viewModel: AppViewModel) {
@@ -64,6 +77,7 @@ fun AllStandsScreen(viewModel: AppViewModel) {
 
     val updateStandNameError by viewModel.updateNameErrorMessage.collectAsState()
     val deleteStandError by viewModel.deleteStandErrorMessage.collectAsState()
+    val addSitError by viewModel.addSitErrorMessage.collectAsState()
 
     val context = LocalContext.current
 
@@ -79,6 +93,11 @@ fun AllStandsScreen(viewModel: AppViewModel) {
         if (updateStandNameError != null) {
             Toast.makeText(context, updateStandNameError, Toast.LENGTH_SHORT).show()
             viewModel.clearUpdateNameError()
+        }
+        // Handle DB error for update stand sit count/add sit record
+        if (addSitError != null) {
+            Toast.makeText(context, addSitError, Toast.LENGTH_SHORT).show()
+            viewModel.clearAddSitError()
         }
     }
 
@@ -115,7 +134,7 @@ fun AllStandsScreen(viewModel: AppViewModel) {
         }
     }
 }
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StandsContentCard(
     viewModel: AppViewModel,
@@ -128,6 +147,11 @@ fun StandsContentCard(
     var changeStandInput by remember { mutableStateOf(stand.name) }
 
     val updateStandNameTakenError by viewModel.updateStandNameTakenErrorMessage.collectAsState()
+
+    // Date Picker Logic
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState()
+    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
 
     Box(
         modifier = Modifier
@@ -231,19 +255,72 @@ fun StandsContentCard(
                         }
                     }
 
-                    // Button to delete stand
-                    Button(
-                        onClick = { onDelete(stand) },
-                        modifier = Modifier.fillMaxWidth(0.4f).padding(top = 10.dp),
-                        colors = ButtonDefaults.buttonColors(Color.Red, Color.White)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Text("Delete", style = MaterialTheme.typography.labelLarge)
-                    }
+                        Button(
+                            onClick = { showDatePicker = true },
+                            modifier = Modifier.weight(0.7f),
+                            colors = ButtonDefaults.buttonColors(containerColor = HunterOrange, contentColor = Color.White)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CalendarMonth,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = Color.White
+                                )
+                            Spacer(modifier = Modifier.width(5.dp))
+                            Text("Add Sit")
+                        }
+                        // Button to delete stand
+                        Button(
+                            onClick = { onDelete(stand) },
+                            modifier = Modifier.weight(0.7f),
+                            colors = ButtonDefaults.buttonColors(Color.Red, Color.White)
+                        ) {
+                            Text("Delete", style = MaterialTheme.typography.labelLarge)
+                        }
                     }
                 }
             }
         }
     }
+    //Date Picker Dialog
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            selectedDate = Instant.ofEpochMilli(millis)
+                                .atZone(ZoneId.systemDefault())
+                                .toLocalDate()
+                        }
+                        showDatePicker = false
+                        viewModel.addSit(stand, selectedDate)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor  = HunterOrange, contentColor = Color.White)
+                ){ Text("Add Sit") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDatePicker = false },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Black, contentColor = Color.White)
+                    )
+                {Text("Cancel")}
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+}
+
+
+
 
 @Composable
 fun standOverviewCard(text: String, icon: ImageVector, data: Int, modifier: Modifier = Modifier){
