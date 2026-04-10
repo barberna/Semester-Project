@@ -60,7 +60,7 @@ interface HuntHealthDAO {
     suspend fun removeStand(stand: Stand)
 
     @Update
-    suspend fun changeStandName(stand: Stand)
+    suspend fun updateStand(stand: Stand)
 
     @Update
     suspend fun addSit(stand: Stand)
@@ -74,6 +74,9 @@ interface HuntHealthDAO {
 
     @Query("UPDATE Sits SET standName = :newName WHERE standId = :id")
     suspend fun updateSitRecordName(id: Int, newName: String)
+
+    @Query("SELECT COUNT(*) FROM Sits WHERE standId = :id & date >= :tenDaysAgo")
+    suspend fun getStandSitCount(id: Int, tenDaysAgo: LocalDate): Int
 
     @Query("SELECT * FROM Sits WHERE standId = :standId")
     fun getStandSits(standId: Int): Flow<List<Sit>>

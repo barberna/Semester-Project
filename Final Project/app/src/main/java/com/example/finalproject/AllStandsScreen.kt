@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Chair
@@ -64,6 +66,7 @@ import java.time.Instant
 import java.time.LocalDate
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material3.contentColorFor
+import com.example.finalproject.ui.theme.LightestGray
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -75,29 +78,18 @@ fun AllStandsScreen(viewModel: AppViewModel) {
     val totalStands by viewModel.totalStands.collectAsState()
     val avgSits by viewModel.averageSits.collectAsState()
 
-    val updateStandNameError by viewModel.updateNameErrorMessage.collectAsState()
-    val deleteStandError by viewModel.deleteStandErrorMessage.collectAsState()
-    val addSitError by viewModel.addSitErrorMessage.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
 
     val context = LocalContext.current
 
 
     // Error Handling (Toast + Clear)
-    LaunchedEffect(updateStandNameError, deleteStandError) {
-        // Handle DB Delete Error (Toast + Clear)
-        if (deleteStandError != null) {
-            Toast.makeText(context, deleteStandError, Toast.LENGTH_SHORT).show()
-            viewModel.clearDeleteStandError()
-        }
-        // Handle DB/System Failure for Name Update(Toast + Clear)
-        if (updateStandNameError != null) {
-            Toast.makeText(context, updateStandNameError, Toast.LENGTH_SHORT).show()
-            viewModel.clearUpdateNameError()
-        }
-        // Handle DB error for update stand sit count/add sit record
-        if (addSitError != null) {
-            Toast.makeText(context, addSitError, Toast.LENGTH_SHORT).show()
-            viewModel.clearAddSitError()
+    // Listens for Viewmodel flow to change if so then displays the message, this message is set to whatever is triggered in model
+    LaunchedEffect(errorMessage) {
+        errorMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            // Clear Message
+            viewModel.clearErrorMessage()
         }
     }
 
@@ -240,7 +232,15 @@ fun StandsContentCard(
                             colors = OutlinedTextFieldDefaults.colors(
                                 unfocusedBorderColor = Color.Black,
                                 focusedBorderColor = Color.Black,
-                                cursorColor = HunterOrange
+                                cursorColor = HunterOrange,
+                                // Add these specifically:
+                                errorBorderColor = Color.Red,
+                                errorLabelColor = Color.Red,
+                                errorCursorColor = Color.Red,
+                                selectionColors = TextSelectionColors(
+                                    handleColor = HunterOrange, // This changes the "arrows" / bubbles
+                                    backgroundColor = HunterOrange.copy(alpha = 0.4f) // The highlight color when text is selected
+                                )
                             )
                         )
                         Spacer(modifier = Modifier.width(8.dp))
@@ -250,9 +250,7 @@ fun StandsContentCard(
                             enabled = changeStandInput.isNotBlank() && changeStandInput != stand.name,
                             modifier = Modifier.weight(0.75f).padding(top = 8.dp),
                             colors = ButtonDefaults.buttonColors(Color.Black, Color.White)
-                        ) {
-                            Text("Update Name")
-                        }
+                        ) { Text("Update Name") }
                     }
 
                     Row(
@@ -319,9 +317,6 @@ fun StandsContentCard(
     }
 }
 
-
-
-
 @Composable
 fun standOverviewCard(text: String, icon: ImageVector, data: Int, modifier: Modifier = Modifier){
     Card(
@@ -366,6 +361,29 @@ fun standOverviewCard(text: String, icon: ImageVector, data: Int, modifier: Modi
                 color = Color.Black
             )
         }
+    }
+}
+
+@Composable
+fun HealthBar(status: HealthStatus) {
+
+    val (width, color) = when (status) {
+        HealthStatus.GOOD -> 1.0f to Color(0xFF4CAF50) // Green
+        HealthStatus.OKAY -> 0.75f to Color(0xFFFFEB3B) // Yellow
+        HealthStatus.BAD -> 0.25f to Color(0xFFF44336) // Red
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(16.dp)
+            .background(LightestGray, shape = RoundedCornerShape(10.dp))
+    ){
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(width)
+                .fillMaxHeight()
+                .background(color, RoundedCornerShape(10.dp))
+        )
     }
 }
 

@@ -1,6 +1,7 @@
 package com.example.finalproject
 
 import android.app.Application
+import android.util.Log
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -44,9 +46,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val appDAO: HuntHealthDAO = (application as HuntHealth).appDB.getInstance()
 
     init {
-      viewModelScope.launch(Dispatchers.IO) {
-          appDAO.getStands().collect { _stands.value = it }
-      }
+        // Get all stands from database for UI use on startup
+        viewModelScope.launch(Dispatchers.IO) {
+              appDAO.getStands().collect { _stands.value = it }
+        }
+
+        //  Update Stands Health on Startup due to date changing daily
+
+
     }
 
     // Each stand is a list, so this is a list of lists
@@ -69,22 +76,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     var isLoginSuccessful by mutableStateOf(false)
 
     // DB Error handling
-    private val _addStandErrorMessage = MutableStateFlow<String?>(null)
-    private val _deleteStandErrorMessage = MutableStateFlow<String?>(null)
-    private val _updateNameErrorMessage = MutableStateFlow<String?>(null)
-    private val _addSitErrorMessage = MutableStateFlow<String?>(null)
-
-
-    val addStandErrorMessage: StateFlow<String?> = _addStandErrorMessage
-    val deleteStandErrorMessage: StateFlow<String?> = _deleteStandErrorMessage
-    val updateNameErrorMessage: StateFlow<String?> = _updateNameErrorMessage
-    val addSitErrorMessage: StateFlow<String?> = _addSitErrorMessage
-
-
-    fun clearAddStandError() { _addStandErrorMessage.value = null }
-    fun clearDeleteStandError() { _deleteStandErrorMessage.value = null }
-    fun clearUpdateNameError() { _updateNameErrorMessage.value = null }
-    fun clearAddSitError() { _addSitErrorMessage.value = null }
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage = _errorMessage.asStateFlow()
+    fun clearErrorMessage() { _errorMessage.value = null }
 
 
     // Handles DB Insert Success before navigation back to stand screen
@@ -204,15 +198,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         // store original list in case of error
         val originalList = _stands.value
 
+        // UI Update call
         _stands.value = _stands.value.filter { it.id != stand.id }
 
+        // Database Update call
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 appDAO.removeStand(stand)
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     _stands.value = originalList
-                    _deleteStandErrorMessage.value = "DB error, Could not delete stand. Try again Later."
+                    _errorMessage.value = "Unable to delete stand"
+                    Log.e("Database", "Unable to delete stand", e)
                 }
             }
         }
@@ -232,6 +229,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val originalList = _stands.value
 
         if (!isStandTaken(newName, standToUpdate.id)) {
+            // UI Update
             _stands.value = _stands.value.map { stand ->
                 if (stand.id == standToUpdate.id) {
                     stand.copy(name = newName)
@@ -240,24 +238,26 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
 
-
+            // Database Call
             viewModelScope.launch(Dispatchers.IO) {
                 try {
                     val updatedStand = standToUpdate.copy(name = newName)
                     // Update Stands Table
-                    appDAO.changeStandName(updatedStand)
+                    appDAO.updateStand(updatedStand)
                     // Update Sits Table
                     appDAO.updateSitRecordName(standToUpdate.id, newName)
                 } catch (e: Exception) {
                     // Roll back on the Main Thread if DB fails
                     withContext(Dispatchers.Main) {
                         _stands.value = originalList
-                        _updateNameErrorMessage.value = "DB Error, Could not change name, try again later."
+                        _errorMessage.value = "Unable to update name"
+                        Log.e("Database", "Unable to change stand name", e)
                     }
                 }
             }
         } else {
-            _updateNameErrorMessage.value = "The name $newName is already taken."
+            _errorMessage.value = "$newName is already used."
+            _updateStandNameTakenErrorMessage.value = "Name in use!"
         }
     }
 
@@ -282,7 +282,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             } catch(e: Exception) {
                 withContext(Dispatchers.Main) {
                     _stands.value = originalStands
-                    _addSitErrorMessage.value = "DB Error, Could not update stand Sit Count."
+                    _errorMessage.value = "Unable to update Sit Count."
+                    Log.e("Database", "Unable to update Sit Count in Stands table", e)
                 }
             }
         }
@@ -299,7 +300,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     _stands.value = originalStands
-                    _addSitErrorMessage.value = "DB Error, Could not add sit record."
+                    _errorMessage.value = "Unable to add sit."
+                    Log.e("Database", "Unable to add sit record to Sits table", e)
                 }
             }
         }
@@ -322,10 +324,41 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     _stands.value = originalStands
-                    _addStandErrorMessage.value = "DB Error, Could not add stand, try again later."
+                    _errorMessage.value = "Unable to add stand."
                     _addStandSuccess.value = false
+                    Log.e("Database", "Unable to add stand to Stands", e)
                 }
             }
+        }
+    }
+
+    // Updates Stand health by querying each stands sit count based on stand.id and Current Date - 10 Days
+    fun updateStandHealth() {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val tenDaysAgo = LocalDate.now().minusDays(10)
+                val currentStands = appDAO.getStands().first()
+
+                currentStands.forEach { stand ->
+                    val count = appDAO.getStandSitCount(stand.id, tenDaysAgo)
+                    val newHealthStatus = determineHealthStatus(count)
+
+                    if (stand.healthStatus != newHealthStatus) {
+                        val updatedStand = stand.copy(healthStatus = newHealthStatus)
+                        appDAO.updateStand(updatedStand)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("Viewmodel", "Unable to update HealthStatus", e)
+            }
+        }
+    }
+
+    fun determineHealthStatus(sitCount: Int): HealthStatus {
+        return when (sitCount) {
+            in 0..3 -> HealthStatus.GOOD
+            in 4..6 -> HealthStatus.OKAY
+            else -> HealthStatus.BAD
         }
     }
 }

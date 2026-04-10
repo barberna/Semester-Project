@@ -80,9 +80,6 @@ fun AddStandScreen(
     val context = LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
-    // Collect error from viewModel
-    val addStandError by viewModel.addStandErrorMessage.collectAsState()
-
 
     // Track permission state to safely enable My Location layer
     var locationPermissionGranted by remember {
@@ -140,11 +137,14 @@ fun AddStandScreen(
 
     val addStandSuccess by viewModel.addStandSuccess.collectAsState()
 
+    val errorMessage by viewModel.errorMessage.collectAsState()
 
-    LaunchedEffect(addStandError, addStandSuccess) {
-        if (addStandError != null) {
-            Toast.makeText(context, addStandError, Toast.LENGTH_SHORT).show()
-            viewModel.clearAddStandError()
+
+    LaunchedEffect(errorMessage, addStandSuccess) {
+        errorMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            // Clear Message
+            viewModel.clearErrorMessage()
         }
         // If stand add success call navigation call onAddStand() and clear the error using helper function
         if (addStandSuccess) {

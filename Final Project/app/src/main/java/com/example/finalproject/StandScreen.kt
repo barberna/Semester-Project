@@ -303,29 +303,6 @@ fun StandDetailCard(stand: Stand) {
     }
 }
 
-@Composable
-fun HealthBar(status: HealthStatus) {
-
-    val (width, color) = when (status) {
-        HealthStatus.GOOD -> 1.0f to Color(0xFF4CAF50) // Green
-        HealthStatus.OKAY -> 0.75f to Color(0xFFFFEB3B) // Yellow
-        HealthStatus.BAD -> 0.25f to Color(0xFFF44336) // Red
-    }
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(16.dp)
-            .background(LightestGray, shape = RoundedCornerShape(10.dp))
-    ){
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(width)
-                .fillMaxHeight()
-                .background(color, RoundedCornerShape(10.dp))
-        )
-    }
-}
-
 @Preview(showBackground = true)
 @Composable
 fun StandScreenPreview() {
