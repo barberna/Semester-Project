@@ -52,8 +52,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         //  Update Stands Health on Startup due to date changing daily
-
-
+        updateStandHealth()
     }
 
     // Each stand is a list, so this is a list of lists
@@ -102,8 +101,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val currentUser = _currentUser.asStateFlow()
 
     // Stand status handling
-    private val _status = MutableStateFlow<HealthStatus>(HealthStatus.OKAY)
-    val status: StateFlow<HealthStatus> = _status
+    private val _healthStatus = MutableStateFlow<HealthStatus>(HealthStatus.GOOD)
+    val healthStatus: StateFlow<HealthStatus> = _healthStatus
 
 
     // Getting all Stands that associate with User
@@ -266,37 +265,39 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun addSit(standToUpdate: Stand, date: LocalDate){
         val originalStands = _stands.value
 
+        // Optimistic UI, update UI First
         _stands.value = _stands.value.map { stand ->
             if (stand.id == standToUpdate.id) {
-                stand.copy(sitCount = stand.sitCount + 1)
+                val newSitCount = stand.sitCount + 1
+                // When added Sit, make a new copy
+                stand.copy(sitCount = newSitCount)
             } else {
                 stand
-            }
-        }
-
-        // Update Sit count for stand in Database
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val updatedStand = standToUpdate.copy(sitCount = standToUpdate.sitCount + 1)
-                appDAO.addSit(updatedStand)
-            } catch(e: Exception) {
-                withContext(Dispatchers.Main) {
-                    _stands.value = originalStands
-                    _errorMessage.value = "Unable to update Sit Count."
-                    Log.e("Database", "Unable to update Sit Count in Stands table", e)
-                }
             }
         }
 
         // Add Sit record to database
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                // Add new sit record to DB table Sit
                 val sit = Sit(
                     standId = standToUpdate.id,
                     standName = standToUpdate.name,
                     date = date
                 )
                 appDAO.addSitRecord(sit)
+
+                // Update both stand sit count/Health when new sit is added
+                val tenDaysAgo = LocalDate.now().minusDays(10)
+                val sitsInLastTenDays = appDAO.getStandSitCount(standToUpdate.id, tenDaysAgo)
+                val newHealthStatus = determineHealthStatus(sitsInLastTenDays)
+
+                val updatedStand = standToUpdate.copy(
+                    sitCount = standToUpdate.sitCount + 1,
+                    healthStatus = newHealthStatus
+                )
+
+                appDAO.updateStand(updatedStand)
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     _stands.value = originalStands

@@ -75,7 +75,7 @@ interface HuntHealthDAO {
     @Query("UPDATE Sits SET standName = :newName WHERE standId = :id")
     suspend fun updateSitRecordName(id: Int, newName: String)
 
-    @Query("SELECT COUNT(*) FROM Sits WHERE standId = :id & date >= :tenDaysAgo")
+    @Query("SELECT COUNT(*) FROM Sits WHERE standId = :id AND date >= :tenDaysAgo")
     suspend fun getStandSitCount(id: Int, tenDaysAgo: LocalDate): Int
 
     @Query("SELECT * FROM Sits WHERE standId = :standId")
