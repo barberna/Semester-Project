@@ -24,7 +24,7 @@ fun AppNavHost(
 ) {
     NavHost(
         navController = navController,
-        startDestination = if (viewModel.isLoginSuccessful) Route.StandScreen else Route.LoginScreen,
+        startDestination = Route.StandScreen,
         modifier = modifier
     ) {
         composable<Route.StandScreen> {

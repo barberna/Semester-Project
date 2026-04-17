@@ -72,7 +72,7 @@ import java.time.format.DateTimeFormatter
 
 @Composable
 fun AllStandsScreen(viewModel: AppViewModel) {
-    val stands by viewModel.filteredStands.collectAsState()
+    val stands by viewModel.stands.collectAsState()
 
     val totalSits by viewModel.totalSits.collectAsState()
     val totalStands by viewModel.totalStands.collectAsState()

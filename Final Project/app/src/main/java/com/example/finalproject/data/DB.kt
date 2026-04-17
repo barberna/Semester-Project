@@ -28,8 +28,7 @@ data class Stand(
      val name: String,
      val cord: LatLng,
      val sitCount: Int,
-     val healthStatus: HealthStatus,
-     val userName: String
+     val healthStatus: HealthStatus
 )
 
 @Entity(

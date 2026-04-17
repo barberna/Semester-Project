@@ -67,7 +67,7 @@ import com.google.maps.android.compose.rememberMarkerState
 
 @Composable
 fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewStand: () -> Unit) {
-    val stands by viewModel.filteredStands.collectAsState()
+    val stands by viewModel.stands.collectAsState()
 
     var selectedStand by remember { mutableStateOf<Stand?>(null) }
 

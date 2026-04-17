@@ -81,7 +81,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val navController = rememberNavController()
             FinalProjectTheme {
-                // 1. The Root Box holds the camo image
+                // The Root Box holds the camo image
                 Box(modifier = Modifier.fillMaxSize()) {
                     Image(
                         painter = painterResource(id = R.drawable.img_1), // Replace with your camo drawable
@@ -95,16 +95,8 @@ class MainActivity : ComponentActivity() {
                     Scaffold(
                         modifier = Modifier.fillMaxSize(),
                         containerColor = Color.Transparent, // This kills the white background
-                        topBar = {
-                            if (viewModel.isLoginSuccessful) {
-                                NavBar(viewModel, onLogout = { navController.navigate(Route.LoginScreen) })
-                            }
-                        },
-                        bottomBar = {
-                            if (viewModel.isLoginSuccessful) {
-                                BottomNavigationBar(navController)
-                            }
-                        }
+                        topBar = { NavBar() },
+                        bottomBar = { BottomNavigationBar(navController) }
                     ) { innerPadding ->
                         // 3. The NavHost content
                         AppNavHost(
@@ -182,8 +174,7 @@ fun BottomNavigationBar(navController: NavController){
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NavBar(viewModel: AppViewModel, onLogout: () -> Unit) {
-    var showMenu by remember { mutableStateOf(false) }
+fun NavBar() {
     CenterAlignedTopAppBar(
         colors = TopAppBarColors(
             containerColor = grayGreen,
@@ -209,38 +200,44 @@ fun NavBar(viewModel: AppViewModel, onLogout: () -> Unit) {
                     color = Color.Black,
                     textAlign = TextAlign.Center
                 )
-                Spacer(modifier = Modifier.weight(1f))
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .wrapContentSize(Alignment.TopEnd)
-                ) {
-                    IconButton(onClick = { showMenu = true }, modifier = Modifier.size(50.dp)) {
-                        Icon(
-                            imageVector = Icons.Default.Menu,
-                            contentDescription = "Menu",
-                            modifier = Modifier.size(40.dp)
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false },
-                        offset = DpOffset(x = (-8).dp, y = 0.dp)
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Logout") },
-                            onClick = {
-                                showMenu = false
-                                onLogout()
-                                viewModel.Logout()
-                            },
-                            leadingIcon = { Icon(Icons.Default.ExitToApp, contentDescription = null) }
-                        )
-                    }
-                }
             }
         }
     )
 }
+
+// This use to be in the Topbar, but no longer have logout button
+// This will be reimplemented later when Firebase Auth is added and setting page is added.
+@Composable
+fun Menu(viewModel: AppViewModel, onLogout: () -> Unit) {
+    var showMenu by remember { mutableStateOf(false) }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .wrapContentSize(Alignment.TopEnd)
+    ) {
+        IconButton(onClick = { showMenu = true }, modifier = Modifier.size(50.dp)) {
+            Icon(
+                imageVector = Icons.Default.Menu,
+                contentDescription = "Menu",
+                modifier = Modifier.size(40.dp)
+            )
+        }
+        DropdownMenu(
+            expanded = showMenu,
+            onDismissRequest = { showMenu = false },
+            offset = DpOffset(x = (-8).dp, y = 0.dp)
+        ) {
+            DropdownMenuItem(
+                text = { Text("Logout") },
+                onClick = {
+                    showMenu = false
+                    onLogout()
+                    viewModel.Logout()
+                },
+                leadingIcon = { Icon(Icons.Default.ExitToApp, contentDescription = null) }
+            )
+        }
+    }
+}
+
 

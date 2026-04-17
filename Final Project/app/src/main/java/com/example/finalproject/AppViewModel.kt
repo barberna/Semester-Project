@@ -106,8 +106,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
 
     // Getting all Stands that associate with User
+    // This is no longer needed as we are now using on device only
     val filteredStands: StateFlow<List<Stand>> = combine(stands, currentUser) { standList, user ->
-        standList.filter { it.userName == user } }
+        standList.filter { TODO()  } }
         .stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -115,7 +116,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         )
 
     // Getting total stand count.
-    val totalStands: StateFlow<Int> = filteredStands
+    val totalStands: StateFlow<Int> = _stands
         .map { it.size }
         .stateIn(
             scope = viewModelScope,
@@ -124,7 +125,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         )
 
     // Getting total sits for all stands
-    val totalSits: StateFlow<Int> = filteredStands.map { list ->
+    val totalSits: StateFlow<Int> = _stands.map { list ->
         list.sumOf { it.sitCount } }
         .stateIn(
             scope = viewModelScope,
@@ -133,7 +134,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         )
 
     // Average sits for all stands
-    val averageSits: StateFlow<Int> = filteredStands.map { list ->
+val averageSits: StateFlow<Int> = _stands.map { list ->
         list.map { it.sitCount }.average().toInt() }
         .stateIn(
             scope = viewModelScope,
@@ -141,6 +142,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = 0
         )
 
+    // User Login/Signup
+    // No longer need this
+    // May be future use for Google Auth
     fun Login() {
         viewModelScope.launch {
             isLoading = true
@@ -192,6 +196,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         passwordInput = ""
         passwordInputConfirm = ""
     }
+    // User Login/Signup
 
     fun deleteStand(stand: Stand){
         // store original list in case of error
@@ -216,7 +221,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     // Used to chack if stand is taken
     fun isStandTaken(name: String, currentStandId: Int): Boolean{
-        return filteredStands.value.any { it.name.equals(name, ignoreCase = false) && it.id  != currentStandId}
+        return _stands.value.any { it.name.equals(name, ignoreCase = false) && it.id  != currentStandId}
     }
 
     // Create Function that checks if name is taken by another stand, if not then create a map
@@ -311,7 +316,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun addStand(cord: LatLng, name: String){
         val originalStands = _stands.value
 
-        val newStand = Stand(name = name, cord = cord, sitCount =  0, healthStatus = HealthStatus.GOOD, userName = _currentUser.value)
+        val newStand = Stand(name = name, cord = cord, sitCount =  0, healthStatus = HealthStatus.GOOD)
         _stands.update { it + newStand }
         usernameInput = ""
 

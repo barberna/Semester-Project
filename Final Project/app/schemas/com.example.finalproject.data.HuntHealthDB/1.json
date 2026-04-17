@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "c712dbd1c9b985f72d26535ab478f2ca",
+    "identityHash": "6bdd628aadc84111064c39606a460492",
     "entities": [
       {
         "tableName": "Stands",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `cord` TEXT NOT NULL, `sitCount` INTEGER NOT NULL, `healthStatus` TEXT NOT NULL, `userName` TEXT NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `cord` TEXT NOT NULL, `sitCount` INTEGER NOT NULL, `healthStatus` TEXT NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -35,12 +35,6 @@
           {
             "fieldPath": "healthStatus",
             "columnName": "healthStatus",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "userName",
-            "columnName": "userName",
             "affinity": "TEXT",
             "notNull": true
           }
@@ -115,7 +109,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'c712dbd1c9b985f72d26535ab478f2ca')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '6bdd628aadc84111064c39606a460492')"
     ]
   }
 }
