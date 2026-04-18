@@ -61,11 +61,11 @@ interface HuntHealthDAO {
     @Update
     suspend fun updateStand(stand: Stand)
 
-    @Update
-    suspend fun addSit(stand: Stand)
-
     @Query("SELECT * FROM Stands")
     fun getStands(): Flow<List<Stand>>
+
+    @Query("SELECT * FROM Stands WHERE id = :id")
+    suspend fun getStandId(id: Int): Stand?
 
     // Sits Table Calls
     @Insert

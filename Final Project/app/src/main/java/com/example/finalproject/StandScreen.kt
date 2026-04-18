@@ -38,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -73,9 +74,9 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
     var selectedStand by remember { mutableStateOf<Stand?>(null) }
 
 
-
     val context = LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+
 
     // Track permission state to safely enable My Location layer
     var locationPermissionGranted by remember {
@@ -91,12 +92,30 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
         position = CameraPosition.fromLatLngZoom(defaultLocation, 10f)
     }
 
-    // Location Permission Requester
-    val locationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-            permissions ->
-        locationPermissionGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+    // launcher specifically for Background Permission
+    val backgroundPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            Log.d("Permissions", "Background Location (All the time) granted")
+        }
     }
+
+    // Location Permission Requester
+    // Foreground Launcher
+    val locationPermissionLauncher = rememberLauncherForActivityResult(    ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val fineGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
+        val coarseGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        locationPermissionGranted = fineGranted || coarseGranted
+
+        // CHAIN: If foreground is granted, immediately ask for background (API 29+)
+        if (locationPermissionGranted && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            backgroundPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+        }
+    }
+
+
 
     // Add map Style from JSON data and add it to a val as well as isMylocationEnabled
     // https://mapstyle.withgoogle.com/
@@ -110,6 +129,8 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
     // Track if we have performed initial camera positioning
     var initialPositionSet by remember { mutableStateOf(false) }
 
+
+
     // Launch permission request on start if not already granted
     LaunchedEffect(Unit) {
         if (!locationPermissionGranted) {
@@ -119,10 +140,23 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
                     Manifest.permission.ACCESS_COARSE_LOCATION,
                 )
             )
+        } else {
+            // Check to see what Android they are running, older versions do not need background in two requests
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                val hasBackground = ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.ACCESS_BACKGROUND_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED
+
+                if (!hasBackground) {
+                    backgroundPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                }
+            }
         }
     }
 
+
     // Camera Positioning Logic: First Stand > Current Location > Default (initial value)
+    // Also has listener for added stands and location permission settings, if changed so will map location
     LaunchedEffect(stands, locationPermissionGranted) {
         if (!initialPositionSet) {
             if (stands.isNotEmpty()) {
@@ -139,6 +173,18 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
                 }
             }
         }
+    }
+
+    // Register geofencing by watching stands list
+    LaunchedEffect(stands) {
+        if (locationPermissionGranted && stands.isNotEmpty()) {
+            viewModel.setupGeofencing(context, stands)
+        }
+    }
+
+    // Checks if the user has 'Location Accuracy' on in location settings on device
+    LaunchedEffect(Unit) {
+        viewModel.checkLocationSettings(context)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {

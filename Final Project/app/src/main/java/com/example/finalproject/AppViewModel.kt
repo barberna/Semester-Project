@@ -1,7 +1,13 @@
 package com.example.finalproject
 
+import android.app.Activity
 import android.app.Application
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.content.IntentSender
 import android.util.Log
+import androidx.activity.result.contract.ActivityResultContracts
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -12,6 +18,13 @@ import androidx.lifecycle.viewModelScope
 import com.example.finalproject.data.HuntHealthDAO
 import com.example.finalproject.data.Sit
 import com.example.finalproject.data.Stand
+import com.google.android.gms.location.Geofence
+import com.google.android.gms.location.GeofencingRequest
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.LocationSettingsRequest
+import com.google.android.gms.location.Priority
+import com.google.android.gms.location.SettingsClient
 import com.google.android.gms.maps.model.LatLng
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -360,11 +373,89 @@ val averageSits: StateFlow<Int> = _stands.map { list ->
         }
     }
 
-    fun determineHealthStatus(sitCount: Int): HealthStatus {
-        return when (sitCount) {
-            in 0..3 -> HealthStatus.GOOD
-            in 4..6 -> HealthStatus.OKAY
-            else -> HealthStatus.BAD
+    companion object{
+        fun determineHealthStatus(sitCount: Int): HealthStatus {
+            return when (sitCount) {
+                in 0..3 -> HealthStatus.GOOD
+                in 4..6 -> HealthStatus.OKAY
+                else -> HealthStatus.BAD
+            }
+        }
+    }
+
+
+    // Location Logic
+
+    fun setupGeofencing(context: Context, stands:List<Stand>){
+        val geofencingClient =  LocationServices.getGeofencingClient(context)
+        val geofenceList = stands.map { stand ->
+            Geofence.Builder()
+                .setRequestId(stand.id.toString())
+                .setCircularRegion(stand.cord.latitude, stand.cord.longitude, 50f)
+                .setExpirationDuration(Geofence.NEVER_EXPIRE)
+                .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER)
+                .build()
+        }
+
+        if (geofenceList.isEmpty()) return
+
+        val intent = PendingIntent.getBroadcast(
+            context, 0, Intent(context, GeofenceBroadcastReceiver::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+        )
+
+        val request = GeofencingRequest.Builder()
+            .setInitialTrigger(0)
+            .addGeofences(geofenceList)
+            .build()
+
+         try {
+             // 2. Call the method directly on the client
+             geofencingClient.addGeofences(request, intent).run {
+                 addOnSuccessListener {
+                     Log.d("Geofence", "Successfully registered ${stands.size} geofences")
+                 }
+                 addOnFailureListener { e ->
+                     Log.e("Geofence", "Failed to register geofences: ${e.message}")
+                 }
+             }
+         } catch (e: SecurityException) {
+             Log.e("Geofence", "Permission missing for geofencing", e)
+         }
+    }
+
+    // Checks if the user has 'Location Accuracy' on in location settings on device
+    fun checkLocationSettings(context: Context) {
+        // Define the type of location tracking we need (High Accuracy, 1-second updates)
+        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000).build()
+
+        // Build a request to check if the device's CURRENT settings can handle that request
+        val builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
+
+        // Get the Settings Client which acts as the "checker" for Google Play Services
+        val client: SettingsClient = LocationServices.getSettingsClient(context)
+
+        // Start the task to check settings
+        val task = client.checkLocationSettings(builder.build())
+
+        // If settings are NOT correct (e.g., GPS is off), this listener triggers
+        task.addOnFailureListener { exception ->
+            // Check if the error is "Resolvable" (meaning we can show a popup to fix it)
+            if (exception is com.google.android.gms.common.api.ResolvableApiException) {
+                try {
+                    // Try to cast the context to an Activity so we can host the popup dialog
+                    val activity = context as? Activity
+
+                    // FIX: Call startResolutionForResult on the cast exception.
+                    // This triggers the "Google Location Accuracy" system dialog.
+                    // 12345 is just a request code to identify this result later.
+                    exception.startResolutionForResult(activity!!, 12345)
+
+                } catch (sendEx: IntentSender.SendIntentException) {
+                    // If the intent failed to send, we ignore it
+                    Log.e("Settings", "Error opening location settings dialog", sendEx)
+                }
+            }
         }
     }
 }
