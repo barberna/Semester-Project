@@ -1,8 +1,10 @@
 package com.example.finalproject
 
 import android.Manifest
-
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
+import android.location.Location
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -16,10 +18,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -52,8 +52,9 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.example.finalproject.data.Stand
 import com.example.finalproject.ui.theme.HunterOrange
-import com.example.finalproject.ui.theme.LightestGray
+import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
@@ -130,7 +131,7 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
                 initialPositionSet = true
             } else if (locationPermissionGranted) {
                 // Priority 2: Focus on current location (if no stands yet)
-                getCurrentLocation(fusedLocationClient) { location ->
+                fetchLocation(fusedLocationClient) { location ->
                     if (!initialPositionSet) { // Double check in case stands loaded during async call
                         cameraPositionState.position = CameraPosition.fromLatLngZoom(location, 13f)
                         initialPositionSet = true
@@ -302,6 +303,31 @@ fun StandDetailCard(stand: Stand) {
         }
     }
 }
+
+// This allows for the locationpermisiongranted to be changed if on initial app install and launch,
+// It then re-triggers launcheffect and auto updates map location with current location
+@SuppressLint("MissingPermission")
+fun fetchLocation(
+    fusedLocationClient: FusedLocationProviderClient,
+    onLocationRetrieved: (LatLng) -> Unit
+) {
+    fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
+        if (location != null) {
+            onLocationRetrieved(LatLng(location.latitude, location.longitude))
+        } else {
+            // Force a fresh fix if lastLocation is null (common on fresh installation)
+            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                .addOnSuccessListener { freshLocation: Location? ->
+                    freshLocation?.let {
+                        onLocationRetrieved(LatLng(it.latitude, it.longitude))
+                    }
+                }
+        }
+    }.addOnFailureListener { e ->
+        Log.e("MapsError", "Location fetch failed: ${e.message}")
+    }
+}
+
 
 @Preview(showBackground = true)
 @Composable
