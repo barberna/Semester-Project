@@ -56,7 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.finalproject.data.Stand
 import com.example.finalproject.ui.theme.HunterOrange
-
+import java.time.LocalDateTime
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -143,7 +143,7 @@ fun StandsContentCard(
     // Date Picker Logic
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
-    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    var selectedDate by remember { mutableStateOf(LocalDateTime.now()) }
 
     Box(
         modifier = Modifier
@@ -296,7 +296,7 @@ fun StandsContentCard(
                         datePickerState.selectedDateMillis?.let { millis ->
                             selectedDate = Instant.ofEpochMilli(millis)
                                 .atZone(ZoneId.systemDefault())
-                                .toLocalDate()
+                                .toLocalDateTime()
                         }
                         showDatePicker = false
                         viewModel.addSit(stand, selectedDate)

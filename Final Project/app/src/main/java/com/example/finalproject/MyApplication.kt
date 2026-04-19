@@ -10,6 +10,7 @@ class HuntHealth: Application() {
         super.onCreate()
         appDB = Room.databaseBuilder(applicationContext,
             HuntHealthDB::class.java, name = "my-huntdb")
+            .fallbackToDestructiveMigration(true)
             .build()
     }
 }

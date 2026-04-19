@@ -1,11 +1,13 @@
 package com.example.finalproject
 
+import android.Manifest
 import android.app.Activity
 import android.app.Application
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.IntentSender
+import android.content.pm.PackageManager
 import android.util.Log
 import androidx.activity.result.contract.ActivityResultContracts
 
@@ -13,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.finalproject.data.HuntHealthDAO
@@ -41,6 +44,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.sql.Date
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 enum class HealthStatus {GOOD, OKAY, BAD}
 
@@ -280,7 +284,7 @@ val averageSits: StateFlow<Int> = _stands.map { list ->
 
     // Add a sit to stand manually
     // !! Need to Add date input for stand data collection to calculate stand health.
-    fun addSit(standToUpdate: Stand, date: LocalDate){
+    fun addSit(standToUpdate: Stand, date: LocalDateTime){
         val originalStands = _stands.value
 
         // Optimistic UI, update UI First
@@ -306,7 +310,7 @@ val averageSits: StateFlow<Int> = _stands.map { list ->
                 appDAO.addSitRecord(sit)
 
                 // Update both stand sit count/Health when new sit is added
-                val tenDaysAgo = LocalDate.now().minusDays(10)
+                val tenDaysAgo = LocalDateTime.now().minusDays(10)
                 val sitsInLastTenDays = appDAO.getStandSitCount(standToUpdate.id, tenDaysAgo)
                 val newHealthStatus = determineHealthStatus(sitsInLastTenDays)
 
@@ -355,7 +359,7 @@ val averageSits: StateFlow<Int> = _stands.map { list ->
     fun updateStandHealth() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val tenDaysAgo = LocalDate.now().minusDays(10)
+                val tenDaysAgo = LocalDateTime.now().minusDays(10)
                 val currentStands = appDAO.getStands().first()
 
                 currentStands.forEach { stand ->
@@ -385,19 +389,22 @@ val averageSits: StateFlow<Int> = _stands.map { list ->
 
 
     // Location Logic
-
+    var locationPermissionGranted by mutableStateOf(false)
     fun setupGeofencing(context: Context, stands:List<Stand>){
+        if (stands.isEmpty()) return
+
         val geofencingClient =  LocationServices.getGeofencingClient(context)
         val geofenceList = stands.map { stand ->
             Geofence.Builder()
                 .setRequestId(stand.id.toString())
-                .setCircularRegion(stand.cord.latitude, stand.cord.longitude, 50f)
+                .setCircularRegion(stand.cord.latitude, stand.cord.longitude, 75f)
                 .setExpirationDuration(Geofence.NEVER_EXPIRE)
+                // This tells when to trigger when it comes to the geofence
                 .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER)
                 .build()
         }
 
-        if (geofenceList.isEmpty()) return
+
 
         val intent = PendingIntent.getBroadcast(
             context, 0, Intent(context, GeofenceBroadcastReceiver::class.java),
@@ -405,6 +412,8 @@ val averageSits: StateFlow<Int> = _stands.map { list ->
         )
 
         val request = GeofencingRequest.Builder()
+            // setInitialTrigger(0) ensures it won't trigger a sit
+            // just because you opened the app while already sitting at the stand.
             .setInitialTrigger(0)
             .addGeofences(geofenceList)
             .build()
@@ -456,6 +465,24 @@ val averageSits: StateFlow<Int> = _stands.map { list ->
                     Log.e("Settings", "Error opening location settings dialog", sendEx)
                 }
             }
+        }
+    }
+
+    // Location functions to clean up UI Logic
+    fun performOnStartChecks(context: Context) {
+        // Check current Location status
+        locationPermissionGranted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        // Trigger Google Location Accuracy popup if needed
+        checkLocationSettings(context)
+    }
+
+    fun syncGeofencing(context: Context) {
+        val currentStands = _stands.value
+        if (locationPermissionGranted && currentStands.isNotEmpty()) {
+            setupGeofencing(context, currentStands)
         }
     }
 }

@@ -1,22 +1,17 @@
 package com.example.finalproject
 
 import android.Manifest
-import android.R
 import android.annotation.SuppressLint
-import android.content.pm.PackageManager
-import android.graphics.Paint
 import android.location.Location
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,27 +31,18 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
-import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import com.example.finalproject.ui.theme.HunterOrange
-import com.example.finalproject.ui.theme.LightestGray
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.model.CameraPosition
@@ -68,7 +54,6 @@ import com.google.maps.android.compose.MapUiSettings
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.MarkerState
 import com.google.maps.android.compose.rememberCameraPositionState
-import com.google.maps.android.ktx.model.cameraPosition
 
 @Composable
 fun AddStandScreen(
@@ -80,15 +65,6 @@ fun AddStandScreen(
     val context = LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
-
-    // Track permission state to safely enable My Location layer
-    var locationPermissionGranted by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        )
-    }
-
     // Create a Default camera/location in case of no location permission
     val defaultLocation = LatLng(42.9634, -85.6681)
     val cameraPositionState = rememberCameraPositionState {
@@ -96,30 +72,35 @@ fun AddStandScreen(
     }
 
     // Location Permission Requester
-    val locationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-        permissions ->
-        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        locationPermissionGranted = granted
-        if (granted) {
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+        viewModel.locationPermissionGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
+        if (viewModel.locationPermissionGranted) {
             getCurrentLocation(fusedLocationClient) { location ->
                 cameraPositionState.position = CameraPosition.fromLatLngZoom(location, 13f)
             }
         }
     }
 
-    // Add map Style from JSON data and add it to a val as well as isMylocationEnabled
+    // Add map Style from JSON data and add it to a val as well as location permissions
     // https://mapstyle.withgoogle.com/
-    val mapProperties = remember(locationPermissionGranted) {
+    val mapProperties = remember(viewModel.locationPermissionGranted) {
         MapProperties(
-            mapStyleOptions = MapStyleOptions.loadRawResourceStyle(context, com.example.finalproject.R.raw.map_style),
-            isMyLocationEnabled = locationPermissionGranted
+            mapStyleOptions = MapStyleOptions.loadRawResourceStyle(context, R.raw.map_style),
+            isMyLocationEnabled = viewModel.locationPermissionGranted
+        )
+    }
+
+    val uiSettings = remember(viewModel.locationPermissionGranted) {
+        MapUiSettings(
+            myLocationButtonEnabled = viewModel.locationPermissionGranted,
+            zoomControlsEnabled = true
         )
     }
 
     // Launch permission request on start
     LaunchedEffect(Unit) {
-        if (locationPermissionGranted) {
+        if (viewModel.locationPermissionGranted) {
             // We already have it! Just get the location.
             getCurrentLocation(fusedLocationClient) { location ->
                 cameraPositionState.position = CameraPosition.fromLatLngZoom(location, 13f)
@@ -178,7 +159,7 @@ fun AddStandScreen(
                             modifier = Modifier.fillMaxSize(),
                             cameraPositionState = cameraPositionState,
                             properties = mapProperties,
-                            uiSettings = MapUiSettings(myLocationButtonEnabled = locationPermissionGranted),
+                            uiSettings = uiSettings,
                         )
 
                         {

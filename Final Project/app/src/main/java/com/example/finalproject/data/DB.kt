@@ -17,6 +17,7 @@ import com.example.finalproject.HealthStatus
 import com.google.android.gms.maps.model.LatLng
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 @Entity (
     tableName = "Stands",
@@ -46,7 +47,7 @@ data class Sit(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val standId: Int,
     val standName: String,
-    val date: LocalDate
+    val date: LocalDateTime
 )
 
 @Dao
@@ -75,7 +76,10 @@ interface HuntHealthDAO {
     suspend fun updateSitRecordName(id: Int, newName: String)
 
     @Query("SELECT COUNT(*) FROM Sits WHERE standId = :id AND date >= :tenDaysAgo")
-    suspend fun getStandSitCount(id: Int, tenDaysAgo: LocalDate): Int
+    suspend fun getStandSitCount(id: Int, tenDaysAgo: LocalDateTime): Int
+
+    @Query("SELECT * FROM Sits WHERE standId = :id ORDER BY date DESC LIMIT 1")
+    suspend fun getLatestSitForStand(id: Int): Sit?
 
     @Query("SELECT * FROM Sits WHERE standId = :standId")
     fun getStandSits(standId: Int): Flow<List<Sit>>
@@ -109,12 +113,12 @@ class CordConverters {
 
 class DateConverters {
     @TypeConverter
-    fun fromString(value: String?): LocalDate? {
-        return value?.let { LocalDate.parse(it) }
+    fun fromString(value: String?): LocalDateTime? {
+        return value?.let { LocalDateTime.parse(it) }
     }
 
     @TypeConverter
-    fun dateToString(date: LocalDate?): String? {
+    fun dateToString(date: LocalDateTime?): String? {
         return date?.toString()
     }
 }

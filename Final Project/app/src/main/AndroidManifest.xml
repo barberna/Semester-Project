@@ -8,6 +8,9 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
 
     <application
@@ -21,10 +24,27 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.FinalProject">
 
+        <!-- 1. THE GEOFENCE RECEIVER (Must have the correct name) -->
         <receiver
             android:name=".GeofenceBroadcastReceiver"
             android:enabled="true"
-            android:exported="true"/>
+            android:exported="true"
+            tools:ignore="ExportedReceiver">
+            <intent-filter>
+                <action android:name="com.google.android.gms.location.GeofenceStore.ACTION_GEOFENCE_EVENT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 2. THE BOOT RECEIVER (To re-register fences after a phone restart) -->
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
 
         <meta-data
             android:name="com.google.android.geo.API_KEY"

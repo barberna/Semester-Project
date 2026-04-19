@@ -3,7 +3,6 @@ package com.example.finalproject
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.pm.PackageManager
-import android.location.Location
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -38,7 +37,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -47,7 +45,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -55,7 +52,6 @@ import com.example.finalproject.data.Stand
 import com.example.finalproject.ui.theme.HunterOrange
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MapStyleOptions
@@ -77,15 +73,6 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
     val context = LocalContext.current
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
-
-    // Track permission state to safely enable My Location layer
-    var locationPermissionGranted by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        )
-    }
-
     // Create a Default camera/location in case of no location permission
     val defaultLocation = LatLng(42.9634, -85.6681)
     val cameraPositionState = rememberCameraPositionState {
@@ -94,7 +81,7 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
 
     // launcher specifically for Background Permission
     val backgroundPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
+        ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         if (isGranted) {
             Log.d("Permissions", "Background Location (All the time) granted")
@@ -103,67 +90,77 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
 
     // Location Permission Requester
     // Foreground Launcher
-    val locationPermissionLauncher = rememberLauncherForActivityResult(    ActivityResultContracts.RequestMultiplePermissions()
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val fineGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
-        val coarseGranted = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        locationPermissionGranted = fineGranted || coarseGranted
-
+        viewModel.locationPermissionGranted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true
         // CHAIN: If foreground is granted, immediately ask for background (API 29+)
-        if (locationPermissionGranted && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+        if (viewModel.locationPermissionGranted && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
             backgroundPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
         }
     }
 
-
-
     // Add map Style from JSON data and add it to a val as well as isMylocationEnabled
     // https://mapstyle.withgoogle.com/
-    val mapProperties = remember(locationPermissionGranted) {
+    val mapProperties = remember(viewModel.locationPermissionGranted) {
         MapProperties(
             mapStyleOptions = MapStyleOptions.loadRawResourceStyle(context, com.example.finalproject.R.raw.map_style),
-            isMyLocationEnabled = locationPermissionGranted
+            isMyLocationEnabled = viewModel.locationPermissionGranted
+        )
+    }
+
+    val uiSettings = remember(viewModel.locationPermissionGranted) {
+        MapUiSettings(
+            myLocationButtonEnabled = viewModel.locationPermissionGranted,
+            zoomControlsEnabled = true
         )
     }
 
     // Track if we have performed initial camera positioning
     var initialPositionSet by remember { mutableStateOf(false) }
 
-
-
     // Launch permission request on start if not already granted
     LaunchedEffect(Unit) {
-        if (!locationPermissionGranted) {
+        viewModel.performOnStartChecks(context)
+
+        if (!viewModel.locationPermissionGranted) {
             locationPermissionLauncher.launch(
                 arrayOf(
                     Manifest.permission.ACCESS_FINE_LOCATION,
                     Manifest.permission.ACCESS_COARSE_LOCATION,
                 )
             )
-        } else {
-            // Check to see what Android they are running, older versions do not need background in two requests
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-                val hasBackground = ContextCompat.checkSelfPermission(
-                    context, Manifest.permission.ACCESS_BACKGROUND_LOCATION
-                ) == PackageManager.PERMISSION_GRANTED
+        // Check to see what Android they are running, older versions do not need background in two requests
+        } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
 
-                if (!hasBackground) {
+            if ( ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                     backgroundPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-                }
             }
         }
     }
 
+    // Use a flag to prevent constant re-registration stand geofence
+    var geofencesRegistered by remember { mutableStateOf(false) }
+
+    // Register geofencing by watching stands list and permissions
+    // Also check if user has Location Accuracy on in their settings
+    LaunchedEffect(stands, viewModel.locationPermissionGranted) {
+        if (viewModel.locationPermissionGranted && !geofencesRegistered) {
+            viewModel.syncGeofencing(context)
+            geofencesRegistered = true
+        }
+    }
 
     // Camera Positioning Logic: First Stand > Current Location > Default (initial value)
     // Also has listener for added stands and location permission settings, if changed so will map location
-    LaunchedEffect(stands, locationPermissionGranted) {
+    LaunchedEffect(stands, viewModel.locationPermissionGranted) {
         if (!initialPositionSet) {
             if (stands.isNotEmpty()) {
                 // Priority 1: Focus on the first stand
                 cameraPositionState.position = CameraPosition.fromLatLngZoom(stands[0].cord, 11f)
                 initialPositionSet = true
-            } else if (locationPermissionGranted) {
+            } else if (viewModel.locationPermissionGranted) {
                 // Priority 2: Focus on current location (if no stands yet)
                 fetchLocation(fusedLocationClient) { location ->
                     if (!initialPositionSet) { // Double check in case stands loaded during async call
@@ -173,18 +170,6 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
                 }
             }
         }
-    }
-
-    // Register geofencing by watching stands list
-    LaunchedEffect(stands) {
-        if (locationPermissionGranted && stands.isNotEmpty()) {
-            viewModel.setupGeofencing(context, stands)
-        }
-    }
-
-    // Checks if the user has 'Location Accuracy' on in location settings on device
-    LaunchedEffect(Unit) {
-        viewModel.checkLocationSettings(context)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -210,10 +195,7 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
                     GoogleMap(
                         modifier = Modifier.fillMaxSize(),
                         cameraPositionState = cameraPositionState,
-                        uiSettings = MapUiSettings(
-                            rotationGesturesEnabled = false,
-                            tiltGesturesEnabled = false
-                        ),
+                        uiSettings = uiSettings,
                         properties = mapProperties,
                         onMapClick = { selectedStand = null }
                     ) {
@@ -297,8 +279,7 @@ fun StandDetailCard(stand: Stand) {
                 )
             }
             Spacer(modifier = Modifier.width(16.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(5.dp))
-             {
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text(
                     text = stand.name,
                     style = MaterialTheme.typography.titleLarge,
@@ -357,26 +338,23 @@ fun fetchLocation(
     fusedLocationClient: FusedLocationProviderClient,
     onLocationRetrieved: (LatLng) -> Unit
 ) {
-    fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
+    // Try the "Instant" method first (cached location)
+    fusedLocationClient.lastLocation.addOnSuccessListener { location ->
         if (location != null) {
             onLocationRetrieved(LatLng(location.latitude, location.longitude))
         } else {
-            // Force a fresh fix if lastLocation is null (common on fresh installation)
-            fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
-                .addOnSuccessListener { freshLocation: Location? ->
-                    freshLocation?.let {
-                        onLocationRetrieved(LatLng(it.latitude, it.longitude))
-                    }
+            // If lastLocation is null, request a "Fresh" location
+            // This is common on emulators or if GPS was recently off.
+            Log.d("Location", "Last location null, requesting fresh location...")
+
+            fusedLocationClient.getCurrentLocation(
+                com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY,
+                null // Use null for no cancellation token
+            ).addOnSuccessListener { freshLocation ->
+                freshLocation?.let {
+                    onLocationRetrieved(LatLng(it.latitude, it.longitude))
                 }
+            }
         }
-    }.addOnFailureListener { e ->
-        Log.e("MapsError", "Location fetch failed: ${e.message}")
     }
-}
-
-
-@Preview(showBackground = true)
-@Composable
-fun StandScreenPreview() {
-
 }
