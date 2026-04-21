@@ -172,6 +172,14 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
         }
     }
 
+    // If we transition from 0 stands to 1 stand, snap to it
+    LaunchedEffect(stands.size) {
+        if (stands.size == 1) {
+            cameraPositionState.position = CameraPosition.fromLatLngZoom(stands[0].cord, 11f)
+            initialPositionSet = true
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
