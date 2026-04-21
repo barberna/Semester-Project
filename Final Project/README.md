@@ -1,4 +1,4 @@
-# Hunt Health
+# Hunt Health Tutorial
 
 **Hunt Health** is a modern Android application designed for hunters to manage their hunting stands and track "sit" frequency. By monitoring how often a stand is visited, the app helps hunters maintain "stand health" to avoid over-hunting specific locations.
 
@@ -28,6 +28,19 @@
     - Google Play Services Location (Fused Location & Geofencing)
 - **Navigation**: Type-safe Compose Navigation
 
+## 📦 Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/hunt-health.git
+   ```
+2. Open the project in **Android Studio Jellyfish** or newer.
+3. Add your Google Maps API Key to `local.properties`:
+   ```properties
+   MAPS_API_KEY=YOUR_API_KEY_HERE
+   ```
+4. Build and run the app on an emulator or physical device.
+
 ### 🗺️ Maps SDK
 Hunt Health utilizes the **Google Maps SDK for Android** with the **Maps Compose** library to provide an interactive, state-driven mapping experience.
 
@@ -56,7 +69,35 @@ Hunt Health utilizes the **Google Maps SDK for Android** with the **Maps Compose
   - Link Google Maps API map style: https://mapstyle.withgoogle.com/ 
   - This is set in variable and used as a parameter in the Google Map composable, properties
 - **State Management**: Uses `CameraPositionState` to programmatically pan and zoom the map based on the user's location or the location of their hunting stands.
+  - In Hunt Health the idea is to have the users stands as the current map view. This LaunchEffect, watches the stands data class, and our location permissions
+    - This checks if we have the initial map position set, if not then we check our first priority, stands
+    - If there are no stands then we want to give the user a map location that is familiar, their location.
+    - If we do not have location permissions from the user then we use a default location so the map can work. 
+  - When the app is destroyed this Launch effect is ran to set initial camera state of the map.
+  - It is important that you have a defult/backup location in case 
+  
+```kotlin
+LaunchedEffect(stands, viewModel.locationPermissionGranted) {
+        if (!initialPositionSet) {
+            if (stands.isNotEmpty()) {
+                // Priority 1: Focus on the first stand
+                cameraPositionState.position = CameraPosition.fromLatLngZoom(stands[0].cord, 11f)
+                initialPositionSet = true
+            } else if (viewModel.locationPermissionGranted) {
+                // Priority 2: Focus on current location (if no stands yet)
+                fetchLocation(fusedLocationClient) { location ->
+                    if (!initialPositionSet) { // Double check in case stands loaded during async call
+                        cameraPositionState.position = CameraPosition.fromLatLngZoom(location, 13f)
+                        initialPositionSet = true
+                    }
+                }
+            }
+        }
+    }
+```
+
 - **Dynamic Markers**: Stand locations are rendered as interactive markers that, when tapped, trigger a Compose `AnimatedVisibility` card showing stand-specific details.
+  - 
 
 ```kotlin
 // Map implementation in StandScreen.kt
@@ -99,7 +140,7 @@ The app leverages **Google Play Services Location** to handle high-accuracy trac
 // Geofence registration in AppViewModel.kt
 val geofence = Geofence.Builder()
     .setRequestId(stand.id.toString())
-    .setCircularRegion(stand.cord.latitude, stand.cord.longitude, 100f)
+    .setCircularRegion(stand.cord.latitude, stand.cord.longitude, 75f)
     .setExpirationDuration(Geofence.NEVER_EXPIRE)
     .setTransitionTypes(Geofence.GEOFENCE_TRANSITION_ENTER)
     .build()
@@ -112,28 +153,11 @@ val request = GeofencingRequest.Builder()
 geofencingClient.addGeofences(request, geofencePendingIntent)
 ```
 
+## Coding Instructions
 
 
 ## 📸 Screenshots
 
 *(Add screenshots of your app here after uploading them to a `screenshots` folder in your repo)*
 
-## 📦 Installation
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/hunt-health.git
-   ```
-2. Open the project in **Android Studio Jellyfish** or newer.
-3. Add your Google Maps API Key to `local.properties`:
-   ```properties
-   MAPS_API_KEY=YOUR_API_KEY_HERE
-   ```
-4. Build and run the app on an emulator or physical device.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-*Developed for CIS-357 Semester Project - Winter 2026*
