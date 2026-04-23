@@ -83,9 +83,7 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
     val backgroundPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted ->
-        if (isGranted) {
-            Log.d("Permissions", "Background Location (All the time) granted")
-        }
+        if (isGranted) { Log.d("Permissions", "Background Location (All the time) granted") }
     }
 
     // Location Permission Requester
@@ -121,6 +119,7 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
 
     // Launch permission request on start if not already granted
     LaunchedEffect(Unit) {
+        // Get current status on permissions as a bool and set it to viewModel.locationPermissionGranted
         viewModel.performOnStartChecks(context)
 
         if (!viewModel.locationPermissionGranted) {
@@ -130,9 +129,10 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
                     Manifest.permission.ACCESS_COARSE_LOCATION,
                 )
             )
+        // Could convert to checker like foreground
         // Check to see what Android they are running, older versions do not need background in two requests
         } else if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-
+            // If background permission is not granted, which is requested
             if ( ContextCompat.checkSelfPermission(
                     context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                     backgroundPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
