@@ -216,7 +216,7 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
                             )
                         }
                     }
-                    // Clicking on a Pin open shis Surface and when clicked off disappears
+                    // Clicking on a Pin opens this Surface and when clicked off, disappears
                     if (selectedStand == null) {
                         Surface(
                             modifier = Modifier
@@ -346,9 +346,10 @@ fun fetchLocation(
     fusedLocationClient: FusedLocationProviderClient,
     onLocationRetrieved: (LatLng) -> Unit
 ) {
-    // Try the "Instant" method first (cached location)
+    // 1. Attempt to get the Last Known Location
     fusedLocationClient.lastLocation.addOnSuccessListener { location ->
         if (location != null) {
+            // Success: Use the cached location
             onLocationRetrieved(LatLng(location.latitude, location.longitude))
         } else {
             // If lastLocation is null, request a "Fresh" location

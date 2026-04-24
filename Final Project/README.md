@@ -112,7 +112,7 @@ implementation(libs.play.services.location)
   - We only need one LaunchEffect for these permissions which is executed each time the app dies, or there is a change to its parameters. In this case Unit will not trigger the Launch.
   - We need to have to launch instances of background permission
     - One, when app is opened for first time and all permissions are requested, this will fire in LocationPermissionLauncher.
-    - Two, when a user does not get prompted or they declined "Allow all the time", they will get the popup again when they open up the app.
+    - Two, when a user does not get prompted, or they declined "Allow all the time", they will get the popup again when they open up the app.
 ```kotlin
 // Launch permission request on start if not already granted
     LaunchedEffect(Unit) {
@@ -189,10 +189,69 @@ implementation(libs.play.services.location)
     }
 ```
 
-
-
 **Focused Location Provider**:
+ - This is the primary entry point for the Google Play Services loaction APIs. 
+ - This acts as a bridge between our app and Google Play Services.
+ - Here is how I make an instance of this:
+```kotlin
+val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+```
+ - We then use this instant of the LocationServices to call a fetchLocation function.
+ - This function takes in the fusedLocationClient and expects to return a LatLong object through a parameter
+ - We first check if there is a last location, if not then we request a freash location.
+ - Here is the code:
+```kotlin
+// Located in StandScreen.kt
+fun fetchLocation(
+  fusedLocationClient: FusedLocationProviderClient,
+  onLocationRetrieved: (LatLng) -> Unit
+) {
+  // 1. Attempt to get the Last Known Location
+  fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+    if (location != null) {
+      // Success: Use the cached location
+      onLocationRetrieved(LatLng(location.latitude, location.longitude))
+    } else {
+      // If lastLocation is null, request a "Fresh" location
+      // This is common on emulators or if GPS was recently off.
+      Log.d("Location", "Last location null, requesting fresh location...")
 
+      fusedLocationClient.getCurrentLocation(
+        com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY,
+        null // Use null for no cancellation token
+      ).addOnSuccessListener { freshLocation ->
+        freshLocation?.let {
+          onLocationRetrieved(LatLng(it.latitude, it.longitude))
+        }
+      }
+    }
+  }
+}
+```
+  - We then call this function a Launch effect where it is in my AddSTandSCreen to focus the map on the users current location when adding a stand
+  - It is also used in StandScreen.kt(home screen), if there are no stands added, then it focused the home screen map to your current location. 
+  - Here is the LuanchEffect:
+```kotlin
+// Camera Positioning Logic: First Stand > Current Location > Default (initial value)
+    // Also has listener for added stands and location permission settings, if changed so will map location
+    LaunchedEffect(stands, viewModel.locationPermissionGranted) {
+        if (!initialPositionSet) {
+            if (stands.isNotEmpty()) {
+                // Priority 1: Focus on the first stand
+                cameraPositionState.position = CameraPosition.fromLatLngZoom(stands[0].cord, 11f)
+                initialPositionSet = true
+            } else if (viewModel.locationPermissionGranted) {
+                // Priority 2: Focus on current location (if no stands yet)
+                fetchLocation(fusedLocationClient) { location ->
+                    if (!initialPositionSet) { // Double check in case stands loaded during async call
+                        cameraPositionState.position = CameraPosition.fromLatLngZoom(location, 13f)
+                        initialPositionSet = true
+                    }
+                }
+            }
+        }
+    }
+```
 
 **Background Geofencing**:
 
