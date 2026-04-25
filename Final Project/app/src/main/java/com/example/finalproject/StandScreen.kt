@@ -141,7 +141,7 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
     }
 
     // Use a flag to prevent constant re-registration stand geofence
-    var geofencesRegistered by remember { mutableStateOf(false) }
+    //var geofencesRegistered by remember { mutableStateOf(false) }
 
     // Register geofencing by watching stands list and permissions
     // Also check if user has Location Accuracy on in their settings

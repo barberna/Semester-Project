@@ -123,7 +123,7 @@ class DateConverters {
 }
 
 @Database(entities = [Stand::class, Sit::class],
-    version = 1, exportSchema = true)
+    version = 2, exportSchema = true)
 @TypeConverters(CordConverters::class, DateConverters::class)
 abstract class HuntHealthDB: RoomDatabase() {
     abstract fun getInstance(): HuntHealthDAO

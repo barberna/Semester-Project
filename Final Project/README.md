@@ -33,19 +33,22 @@
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/hunt-health.git
+   git https://github.com/barberna/Semester-Project.git
    ```
 2. Open the project in **Android Studio Jellyfish** or newer.
 3. Add your Google Maps API Key to `local.properties`:
    ```properties
    MAPS_API_KEY=YOUR_API_KEY_HERE
    ```
-4. Build and run the app on an emulator or physical device.
+4. Add a location to emulator by going into extended controls
+5. Build and run the app on an emulator or physical device.
+6. Ensure to change app location settings to "Allow all the time" for app
 
 ## DemoVideo
+https://1drv.ms/v/c/076f35e41e36c567/IQBC1QPJ3JEuRLLQxQlHFWYVAdz23rwg7VcEgfCOzyoykpk?e=7NOzM2
 
 ## Presentation Slides
-
+https://youtu.be/2bKjatSm8b8
 
 ## Tutorial
 ### 📍 Location and Context APIs
@@ -330,18 +333,18 @@ val request = GeofencingRequest.Builder()
 ```kotlin
 // AppViewModel.kt
 try {
-             // 2. Call the method directly on the client
-             geofencingClient.addGeofences(request, intent).run {
-                 addOnSuccessListener {
-                     Log.d("Geofence", "Successfully registered ${stands.size} geofences")
-                 }
-                 addOnFailureListener { e ->
-                     Log.e("Geofence", "Failed to register geofences: ${e.message}")
-                 }
-             }
-         } catch (e: SecurityException) {
-             Log.e("Geofence", "Permission missing for geofencing", e)
+     // Call the method directly on the client
+     geofencingClient.addGeofences(request, intent).run {
+         addOnSuccessListener {
+             Log.d("Geofence", "Successfully registered ${stands.size} geofences")
          }
+         addOnFailureListener { e ->
+             Log.e("Geofence", "Failed to register geofences: ${e.message}")
+         }
+     }
+ } catch (e: SecurityException) {
+     Log.e("Geofence", "Permission missing for geofencing", e)
+ }
 ```
 
 **Syncing Geofences in UI**: On fresh app start, new stand addition, or a change in permissions we need these geofences to sync in the UI
@@ -419,7 +422,6 @@ CoroutineScope(Dispatchers.IO).launch {
             val tenDaysAgo = LocalDateTime.now().minusDays(10)
             val count = appDAO.getStandSitCount(standId, tenDaysAgo)
             val newHealthStatus = AppViewModel.determineHealthStatus(count)
-
             val updatedStand = stand.copy(
                 sitCount = stand.sitCount + 1,
                 healthStatus = newHealthStatus
@@ -446,7 +448,7 @@ CoroutineScope(Dispatchers.IO).launch {
     - android:exported="true": This is critical. It allows processes outside the app (specifically Google Play Services) to send intents to this receiver. If this were false, only the app could trigger the receiver, which would break geofencing.
     - The tag `<intent-filter>` r acts as a "security guard" or a "sorting machine." It tells Android: "I don't want to hear about every single broadcast in the system; only wake me up if the message matches this specific type
 ```xml
-<!-- 1. THE GEOFENCE RECEIVER (Must have the correct name) -->
+<!-- THE GEOFENCE RECEIVER (Must have the correct name) -->
         <receiver
             android:name=".GeofenceBroadcastReceiver"
             android:enabled="true"

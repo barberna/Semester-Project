@@ -22,6 +22,8 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
         if (geofencingEvent.geofenceTransition == Geofence.GEOFENCE_TRANSITION_ENTER) {
             val triggeringGeofences = geofencingEvent.triggeringGeofences ?: return
 
+            val pendingResult = goAsync()
+
             val app = context.applicationContext as HuntHealth
             val appDAO = app.appDB.getInstance()
 
@@ -76,6 +78,8 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
 
                     } catch (e: Exception) {
                         Log.e("Geofence", "Unable to add sit record to Sits table", e)
+                    } finally {
+                        pendingResult.finish()
                     }
                 }
             }

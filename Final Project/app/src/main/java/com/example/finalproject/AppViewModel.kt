@@ -385,10 +385,12 @@ val averageSits: StateFlow<Int> = _stands.map { list ->
 
     // Location Logic
     var locationPermissionGranted by mutableStateOf(false)
-    fun setupGeofencing(context: Context, stands:List<Stand>){
+    fun setupGeofencing(context: Context, stands:List<Stand>) {
         if (stands.isEmpty()) return
 
-        val geofencingClient =  LocationServices.getGeofencingClient(context)
+        // FIX: Use applicationContext to avoid potential issues with Activity context leaking or lacking account info
+        val geofencingClient = LocationServices.getGeofencingClient(context.applicationContext)
+
         val geofenceList = stands.map { stand ->
             Geofence.Builder()
                 .setRequestId(stand.id.toString())
@@ -413,23 +415,26 @@ val averageSits: StateFlow<Int> = _stands.map { list ->
         val request = GeofencingRequest.Builder()
             // setInitialTrigger(0) ensures it won't trigger a sit
             // just because you opened the app while already sitting at the stand.
-            .setInitialTrigger(0)
+            // Some devices might throw Geller errors if this isn't handled correctly during recovery.
+            .setInitialTrigger(GeofencingRequest.INITIAL_TRIGGER_ENTER)
             .addGeofences(geofenceList)
             .build()
 
-         try {
-             // 2. Call the method directly on the client
-             geofencingClient.addGeofences(request, intent).run {
-                 addOnSuccessListener {
-                     Log.d("Geofence", "Successfully registered ${stands.size} geofences")
-                 }
-                 addOnFailureListener { e ->
-                     Log.e("Geofence", "Failed to register geofences: ${e.message}")
-                 }
-             }
-         } catch (e: SecurityException) {
-             Log.e("Geofence", "Permission missing for geofencing", e)
-         }
+        geofencingClient.removeGeofences(intent).addOnCompleteListener {
+            try {
+                // 2. Now add the new request
+                geofencingClient.addGeofences(request, intent).run {
+                    addOnSuccessListener {
+                        Log.d("Geofence", "Registered ${stands.size} stands. (Reset Sync)")
+                    }
+                    addOnFailureListener { e ->
+                        Log.e("Geofence", "Failed to register: ${e.message}")
+                    }
+                }
+            } catch (e: SecurityException) {
+                Log.e("Geofence", "Permission missing", e)
+            }
+        }
     }
 
     // Checks if the user has 'Location Accuracy' on in location settings on device
@@ -485,4 +490,3 @@ val averageSits: StateFlow<Int> = _stands.map { list ->
         }
     }
 }
-
