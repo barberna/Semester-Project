@@ -45,10 +45,10 @@
 6. Ensure to change app location settings to "Allow all the time" for app
 
 ## DemoVideo
-https://1drv.ms/v/c/076f35e41e36c567/IQBC1QPJ3JEuRLLQxQlHFWYVAdz23rwg7VcEgfCOzyoykpk?e=7NOzM2
+https://youtu.be/2bKjatSm8b8
 
 ## Presentation Slides
-https://youtu.be/2bKjatSm8b8
+https://docs.google.com/presentation/d/1upWDbonxaYIPkegcAdXOaXrbEKFuFa2102kq0P2VXoU/edit?usp=sharing
 
 ## Tutorial
 ### 📍 Location and Context APIs
