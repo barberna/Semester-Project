@@ -9,12 +9,9 @@ import android.content.Intent
 import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.util.Log
-import androidx.activity.result.contract.ActivityResultContracts
-
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -42,8 +39,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.sql.Date
-import java.time.LocalDate
 import java.time.LocalDateTime
 
 enum class HealthStatus {GOOD, OKAY, BAD}
@@ -405,11 +400,15 @@ val averageSits: StateFlow<Int> = _stands.map { list ->
         }
 
 
-
+        // getBroadcast: Tells the system that when a geofence is triggered, it should send a Broadcast.
+        // GeofenceBroadcastReceiver::class.java: This is the specific class that will "wake up" to handle the event.
+        // FLAG_UPDATE_CURRENT: If geofences are already registered, this tells the system to just update the existing intent rather than creating a brand new one.
+        // FLAG_MUTABLE: Crucial for Android 12+. Since Google Play Services needs to add location data (the transition details) into the intent before sending it to you, the intent must be "mutable" (changeable).
         val intent = PendingIntent.getBroadcast(
             context, 0, Intent(context, GeofenceBroadcastReceiver::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
         )
+
 
         val request = GeofencingRequest.Builder()
             // setInitialTrigger(0) ensures it won't trigger a sit

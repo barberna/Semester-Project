@@ -16,7 +16,6 @@ import androidx.room.Update
 import com.example.finalproject.HealthStatus
 import com.google.android.gms.maps.model.LatLng
 import kotlinx.coroutines.flow.Flow
-import java.time.LocalDate
 import java.time.LocalDateTime
 
 @Entity (

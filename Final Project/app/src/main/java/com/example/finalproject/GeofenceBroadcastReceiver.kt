@@ -31,14 +31,17 @@ class GeofenceBroadcastReceiver : BroadcastReceiver() {
                 // Update your DB here. Since this is a receiver, it's best to
                 // call a function in your Repository or use a WorkManager.
 
-
+                // To have all database operations off the main thread
+                // All suspend function need to be called in suspend functions or CoroutineScope.
+                // The onReceive only allows for short operation time, this ensures enough time to complete DB operations
                 CoroutineScope(Dispatchers.IO).launch {
                     try{
+                        // Get last sit from stand, call from DB
                         val lastSit = appDAO.getLatestSitForStand(standId)
                         val now = LocalDateTime.now()
 
                         // TIME-GATE: Only add a sit if:
-                        // - No sit exists yet OR The last sit was more than 3 hours ago
+                        // - No sit exists yet OR The last sit was more than 3 hours ago, set to 2 min for testing
                         // This allows Morning/Evening hunts but ignores GPS jitter (the "bounce")
                         val isNewVisit = lastSit == null || lastSit.date.isBefore(now.minusMinutes(2))
 

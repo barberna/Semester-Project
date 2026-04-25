@@ -146,10 +146,7 @@ fun StandScreen(modifier: Modifier = Modifier, viewModel: AppViewModel, onNewSta
     // Register geofencing by watching stands list and permissions
     // Also check if user has Location Accuracy on in their settings
     LaunchedEffect(stands, viewModel.locationPermissionGranted) {
-        if (viewModel.locationPermissionGranted && !geofencesRegistered) {
             viewModel.syncGeofencing(context)
-            geofencesRegistered = true
-        }
     }
 
     // Camera Positioning Logic: First Stand > Current Location > Default (initial value)
